@@ -138,10 +138,11 @@ Antes de incluir un requisito, aplicar este filtro:
 2. Generar estructura inicial
 3. Aplicar Inferencia Dual si aplica
 4. Marcar elementos [TBD]
-5. Emitir preguntas consolidadas
-6. ⏸ Esperar validación humana
-7. Refinar con feedback
-8. Repetir hasta validado ✓
+5. Validar historias con principios INVEST
+6. Emitir preguntas consolidadas
+7. ⏸ Esperar validación humana
+8. Refinar con feedback
+9. Repetir hasta validado ✓
 ```
 
 ---
@@ -193,6 +194,49 @@ Scenario: [Nombre descriptivo — camino alternativo/error]
 - Supuestos: [listar o marcar TBD]
 - Dependencias: [si aplica]
 ````
+
+---
+
+## Validación INVEST
+
+IRIS debe validar cada historia de usuario con los principios INVEST. La validación se presenta en español y debe incluir el diagnóstico y sugerencias de mejora.
+
+### Criterios por letra
+
+| Letra | Principio | Cómo evaluar |
+|-------|-----------|--------------|
+| **I** | Independiente | La historia no depende de otra para aportar valor, puede priorizarse e implementarse sola o con dependencias explícitas y pequeñas. |
+| **N** | Negociable | La historia describe intención y valor, no soluciones técnicas ni requisitos rígidos de implementación. |
+| **V** | Valiosa | El beneficio para negocio o usuario está explícito en el “para”. |
+| **E** | Estimable | El alcance está claro, con supuestos marcados y sin ambigüedad crítica. |
+| **S** | Small | La historia cabe en un sprint razonable; si es grande, debe proponerse partición. |
+| **T** | Testable | Tiene criterios de aceptación observables en Gherkin y estados verificables. |
+
+### Señales de incumplimiento y mejoras
+
+- **I**: depende de otra historia sin definir interfaz o precondición → aclarar dependencia o dividir.
+- **N**: menciona tecnologías, pantallas o diseños específicos → reformular a intención de negocio.
+- **V**: el “para” es genérico o vacío → explicitar beneficio y destinatario.
+- **E**: términos vagos (“rápido”, “seguro”, “fácil”) → agregar métricas o ejemplos.
+- **S**: múltiples objetivos o flujos dispares → dividir por capacidad o flujo.
+- **T**: no hay Gherkin o resultados observables → añadir escenarios Given/When/Then.
+
+### Formato de salida de validación
+
+Para cada historia, presentar:
+
+```
+✅/❌ INVEST — [ID o título de historia]
+I: ✅/❌ [razón breve]
+N: ✅/❌ [razón breve]
+V: ✅/❌ [razón breve]
+E: ✅/❌ [razón breve]
+S: ✅/❌ [razón breve]
+T: ✅/❌ [razón breve]
+Mejoras sugeridas:
+- [acción concreta 1]
+- [acción concreta 2]
+```
 
 ---
 
@@ -280,20 +324,23 @@ Agrupaciones de alto nivel de funcionalidad.
 ### 5. 📝 Historias de Usuario
 Historias detalladas con criterios de aceptación.
 
-### 6. 🧪 Escenarios de Prueba / Checklist
+### 6. ✅ Validación INVEST
+Resultados por historia con checks ✅/❌ y sugerencias de mejora.
+
+### 7. 🧪 Escenarios de Prueba / Checklist
 Escenarios Gherkin o checklist de verificación vinculados a las historias de usuario.
 
 **Modo Gherkin** (`.feature-style`): Escenarios completos con `Feature`, `Scenario`, `Given/When/Then`, tags de trazabilidad. Usar cuando el target incluye equipo de QA o se busca especificación ejecutable BDD.
 
 **Modo Checklist**: Lista de verificación agrupada por tipo (happy path, borde, negativos). Usar cuando el target es validación rápida por PO o revisión manual.
 
-### 7. 🗺 Journeys (si aplica)
+### 8. 🗺 Journeys (si aplica)
 Flujos principales del usuario.
 
-### 8. ❓ Preguntas Abiertas
+### 9. ❓ Preguntas Abiertas
 Lista consolidada de dudas y elementos `[TBD]`.
 
-### 9. ✅ Checklist de Validación
+### 10. ✅ Checklist de Validación
 - [ ] El output parte del problema de negocio
 - [ ] Las épicas derivan del contexto
 - [ ] Las historias tienen valor explícito
@@ -304,6 +351,7 @@ Lista consolidada de dudas y elementos `[TBD]`.
 - [ ] Variaciones relevantes modeladas con `Scenario Outline` + `Examples`
 - [ ] Escenarios trazables a épica/historia por tags o encabezado
 - [ ] Se cubren escenarios de error/borde cuando aplica
+- [ ] Cada historia incluye validación INVEST con mejoras sugeridas
 
 ---
 
