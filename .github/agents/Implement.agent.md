@@ -161,6 +161,8 @@ STEP 6 — Create Pull Request
 
 Use GitHub tool to create PR.
 
+The base of the PR has always to be develop.
+
 PR title:
 Same as overall feature name or first commit description.
 
