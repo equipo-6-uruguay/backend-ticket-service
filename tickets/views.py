@@ -6,6 +6,7 @@ NO contienen lógica de negocio, NO acceden directamente al ORM.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.response import Response
 from django.db import transaction
 
@@ -34,33 +35,50 @@ from .domain.exceptions import (
 )
 
 
-class TicketViewSet(viewsets.ModelViewSet):
+class TicketViewSet(
+    CreateModelMixin,
+    RetrieveModelMixin,
+    ListModelMixin,
+    viewsets.GenericViewSet,
+):
     """
     ViewSet refactorizado siguiendo principios DDD/EDA.
-    
+
+    Hereda explícitamente de CreateModelMixin, RetrieveModelMixin,
+    ListModelMixin y GenericViewSet. Los mixins UpdateModelMixin y
+    DestroyModelMixin están excluidos INTENCIONALMENTE para impedir
+    que clientes utilicen PUT/PATCH/DELETE genéricos, los cuales
+    evadirían la máquina de estados del dominio, las transiciones
+    de prioridad, la validación XSS y la publicación de eventos.
+
+    Las únicas vías de mutación legítimas son las acciones custom:
+      - PATCH /api/tickets/{id}/status/    → change_status
+      - PATCH /api/tickets/{id}/priority/  → change_priority
+      - POST  /api/tickets/{id}/responses/ → responses
+
     Responsabilidades:
     - Validar entrada HTTP
     - Ejecutar casos de uso
     - Traducir respuestas de dominio a HTTP
     - Manejar excepciones de dominio
-    
+
     NO responsable de:
     - Lógica de negocio (en entidades y casos de uso)
     - Persistencia directa (delegada al repositorio)
     - Publicación de eventos (delegada al event publisher)
     """
-    
+
     queryset = Ticket.objects.all().order_by("-created_at")
     serializer_class = TicketSerializer
-    
+
     def __init__(self, *args, **kwargs):
         """Inicializa las dependencias (repositorio, event publisher, use cases)."""
         super().__init__(*args, **kwargs)
-        
+
         # Inyección de dependencias
         self.repository = DjangoTicketRepository()
         self.event_publisher = RabbitMQEventPublisher()
-        
+
         # Casos de uso
         self.create_ticket_use_case = CreateTicketUseCase(
             repository=self.repository,

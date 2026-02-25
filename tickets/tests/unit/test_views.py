@@ -8,6 +8,8 @@ from rest_framework.test import APIRequestFactory
 from rest_framework.request import Request
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework import status
+from rest_framework.mixins import UpdateModelMixin, CreateModelMixin, RetrieveModelMixin, ListModelMixin
+from rest_framework.viewsets import GenericViewSet
 from unittest.mock import Mock, patch
 
 from tickets.models import Ticket as DjangoTicket
@@ -24,9 +26,96 @@ from tickets.serializer import TicketSerializer
 from datetime import datetime
 
 
+class TestTicketViewSetMixinComposition(TestCase):
+    """Structural tests: verify TicketViewSet inherits only the intended mixins."""
+
+    def test_viewset_does_not_include_update_mixin(self):
+        """UpdateModelMixin must NOT be in the MRO — generic PUT/PATCH disabled."""
+        from rest_framework.mixins import UpdateModelMixin
+        self.assertNotIn(
+            UpdateModelMixin,
+            TicketViewSet.__mro__,
+            "TicketViewSet must NOT inherit UpdateModelMixin",
+        )
+
+    def test_viewset_does_not_include_destroy_mixin(self):
+        """DestroyModelMixin must NOT be in the MRO — generic DELETE disabled."""
+        from rest_framework.mixins import DestroyModelMixin
+        self.assertNotIn(
+            DestroyModelMixin,
+            TicketViewSet.__mro__,
+            "TicketViewSet must NOT inherit DestroyModelMixin",
+        )
+
+    def test_viewset_has_no_update_method_from_mixin(self):
+        """The 'update' action must not be resolvable on TicketViewSet."""
+        viewset = TicketViewSet()
+        actions = getattr(viewset, 'action_map', {})
+        self.assertNotIn('update', dir(UpdateModelMixin))
+        # More robust: ensure no 'update' method inherited from UpdateModelMixin
+        self.assertFalse(
+            hasattr(viewset, 'update') and 'UpdateModelMixin' in str(type(viewset).update),
+            "TicketViewSet must not expose an 'update' action from UpdateModelMixin",
+        )
+
+    def test_viewset_has_no_partial_update_method_from_mixin(self):
+        """The 'partial_update' action must not be resolvable on TicketViewSet."""
+        viewset = TicketViewSet()
+        self.assertFalse(
+            hasattr(viewset, 'partial_update') and 'UpdateModelMixin' in str(type(viewset).partial_update),
+            "TicketViewSet must not expose a 'partial_update' action from UpdateModelMixin",
+        )
+
+    def test_viewset_has_no_destroy_method_from_mixin(self):
+        """The 'destroy' action must not be resolvable on TicketViewSet."""
+        viewset = TicketViewSet()
+        self.assertFalse(
+            hasattr(viewset, 'destroy'),
+            "TicketViewSet must not expose a 'destroy' action",
+        )
+
+    def test_viewset_includes_create_mixin(self):
+        """CreateModelMixin must be in the MRO — POST /api/tickets/ enabled."""
+        self.assertIn(
+            CreateModelMixin,
+            TicketViewSet.__mro__,
+            "TicketViewSet must inherit CreateModelMixin",
+        )
+
+    def test_viewset_includes_retrieve_mixin(self):
+        """RetrieveModelMixin must be in the MRO — GET /api/tickets/{id}/ enabled."""
+        self.assertIn(
+            RetrieveModelMixin,
+            TicketViewSet.__mro__,
+            "TicketViewSet must inherit RetrieveModelMixin",
+        )
+
+    def test_viewset_includes_list_mixin(self):
+        """ListModelMixin must be in the MRO — GET /api/tickets/ enabled."""
+        self.assertIn(
+            ListModelMixin,
+            TicketViewSet.__mro__,
+            "TicketViewSet must inherit ListModelMixin",
+        )
+
+    def test_viewset_inherits_generic_viewset(self):
+        """GenericViewSet must be the base — not ModelViewSet."""
+        self.assertIn(
+            GenericViewSet,
+            TicketViewSet.__mro__,
+            "TicketViewSet must inherit GenericViewSet",
+        )
+        from rest_framework.viewsets import ModelViewSet
+        self.assertNotIn(
+            ModelViewSet,
+            TicketViewSet.__mro__,
+            "TicketViewSet must NOT inherit ModelViewSet",
+        )
+
+
 class TestTicketViewSet(TestCase):
     """Tests del ViewSet con nueva arquitectura DDD."""
-    
+
     def setUp(self):
         """Configurar para cada test."""
         self.factory = APIRequestFactory()
@@ -34,11 +123,11 @@ class TestTicketViewSet(TestCase):
     def _make_drf_request(self, wsgi_request):
         """Envuelve un WSGIRequest en un DRF Request para llamadas directas a métodos del ViewSet."""
         return Request(wsgi_request, parsers=[JSONParser(), FormParser(), MultiPartParser()])
-    
+
     def test_viewset_uses_create_use_case_on_create(self):
         """ViewSet ejecuta CreateTicketUseCase al crear ticket."""
         viewset = TicketViewSet()
-        
+
         # Mockear el caso de uso
         mock_use_case = Mock()
         mock_domain_ticket = DomainTicket(
@@ -50,7 +139,7 @@ class TestTicketViewSet(TestCase):
         )
         mock_use_case.execute.return_value = mock_domain_ticket
         viewset.create_ticket_use_case = mock_use_case
-        
+
         # Crear ticket Django para serializer
         DjangoTicket.objects.create(
             id=123,
@@ -58,33 +147,33 @@ class TestTicketViewSet(TestCase):
             description="Desc",
             status="OPEN"
         )
-        
+
         # Simular perform_create
         serializer = TicketSerializer(data={"title": "Test", "description": "Desc"})
         serializer.is_valid()
-        
+
         viewset.perform_create(serializer)
-        
+
         # Verificar que se ejecutó el caso de uso
         mock_use_case.execute.assert_called_once()
-    
+
     def test_viewset_handles_invalid_ticket_data_exception(self):
         """ViewSet maneja InvalidTicketData y devuelve error de validación."""
         viewset = TicketViewSet()
-        
+
         # Mockear caso de uso para que lance excepción
         mock_use_case = Mock()
         mock_use_case.execute.side_effect = InvalidTicketData("Título vacío")
         viewset.create_ticket_use_case = mock_use_case
-        
+
         serializer = TicketSerializer(data={"title": "", "description": "Desc"})
         serializer.is_valid()
-        
+
         # Debe lanzar ValidationError
         from rest_framework.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             viewset.perform_create(serializer)
-    
+
     def test_change_status_endpoint_executes_use_case(self):
         """Endpoint change_status ejecuta ChangeTicketStatusUseCase."""
         # Crear ticket en BD
@@ -93,9 +182,9 @@ class TestTicketViewSet(TestCase):
             description="Desc",
             status="OPEN"
         )
-        
+
         viewset = TicketViewSet()
-        
+
         # Mockear caso de uso
         mock_use_case = Mock()
         mock_domain_ticket = DomainTicket(
@@ -107,17 +196,17 @@ class TestTicketViewSet(TestCase):
         )
         mock_use_case.execute.return_value = mock_domain_ticket
         viewset.change_status_use_case = mock_use_case
-        
+
         # Crear request
         request = self.factory.patch('', {"status": "IN_PROGRESS"})
-        
+
         # Ejecutar action
         response = viewset.change_status(request, pk=django_ticket.id)
-        
+
         # Verificar que se ejecutó el caso de uso
         mock_use_case.execute.assert_called_once()
         assert response.status_code == status.HTTP_200_OK
-    
+
     def test_change_status_handles_ticket_already_closed(self):
         """ViewSet maneja TicketAlreadyClosed y devuelve 400."""
         django_ticket = DjangoTicket.objects.create(
@@ -125,21 +214,21 @@ class TestTicketViewSet(TestCase):
             description="Desc",
             status="CLOSED"
         )
-        
+
         viewset = TicketViewSet()
-        
+
         # Mockear caso de uso para que lance excepción
         mock_use_case = Mock()
         mock_use_case.execute.side_effect = TicketAlreadyClosed(django_ticket.id)
         viewset.change_status_use_case = mock_use_case
-        
+
         request = self.factory.patch('', {"status": "OPEN"})
-        
+
         response = viewset.change_status(request, pk=django_ticket.id)
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "cerrado" in str(response.data['error']).lower()
-    
+
     def test_change_status_requires_status_field(self):
         """Endpoint change_status requiere el campo 'status'."""
         django_ticket = DjangoTicket.objects.create(
@@ -147,15 +236,15 @@ class TestTicketViewSet(TestCase):
             description="Desc",
             status="OPEN"
         )
-        
+
         viewset = TicketViewSet()
         request = self.factory.patch('', {})  # Sin status
-        
+
         response = viewset.change_status(request, pk=django_ticket.id)
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "requerido" in str(response.data['error']).lower()
-    
+
     def test_change_status_handles_invalid_status(self):
         """ViewSet maneja estado inválido y devuelve 400."""
         django_ticket = DjangoTicket.objects.create(
@@ -163,18 +252,18 @@ class TestTicketViewSet(TestCase):
             description="Desc",
             status="OPEN"
         )
-        
+
         viewset = TicketViewSet()
-        
+
         # Mockear caso de uso para que lance ValueError
         mock_use_case = Mock()
         mock_use_case.execute.side_effect = ValueError("Estado inválido")
         viewset.change_status_use_case = mock_use_case
-        
+
         request = self.factory.patch('', {"status": "INVALID"})
-        
+
         response = viewset.change_status(request, pk=django_ticket.id)
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_change_status_ticket_not_found_returns_404(self):
