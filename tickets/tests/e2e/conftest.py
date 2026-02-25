@@ -9,8 +9,6 @@ All E2E tests in this directory consume these fixtures.
 import pytest
 from unittest.mock import Mock, patch
 
-from rest_framework.test import APIClient
-
 
 # ---------------------------------------------------------------------------
 # API Client
@@ -19,6 +17,7 @@ from rest_framework.test import APIClient
 @pytest.fixture
 def api_client():
     """Return a plain DRF APIClient instance."""
+    from rest_framework.test import APIClient
     return APIClient()
 
 
