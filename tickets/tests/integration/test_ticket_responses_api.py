@@ -129,3 +129,18 @@ class TicketResponseAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
+
+    # ─────────────────────────────────────────────
+    # Ticket not found — POST response on non-existent ticket
+    # ─────────────────────────────────────────────
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_create_response_nonexistent_ticket_returns_404(self, mock_publisher_cls):
+        """POST on non-existent ticket → 404 Not Found."""
+        mock_publisher_cls.return_value = MagicMock()
+
+        payload = {"text": "Respuesta a ticket inexistente", "admin_id": "admin-001"}
+        response = self.client.post("/api/tickets/99999/responses/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("error", response.data)
+        self.assertIn("no encontrado", response.data["error"].lower())
