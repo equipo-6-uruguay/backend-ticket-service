@@ -180,6 +180,11 @@ class TicketViewSet(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     
     @action(detail=True, methods=["patch"], url_path="priority")
     def change_priority(self, request, pk=None):
@@ -198,6 +203,7 @@ class TicketViewSet(
             - 400: Campo 'priority' ausente, ticket cerrado, transición inválida.
             - 403: Permiso denegado (excepción de dominio).
             - 404: Ticket no encontrado.
+            - 500: Error interno inesperado.
         """
         new_priority = request.data.get("priority")
         justification = request.data.get("justification")
@@ -284,9 +290,9 @@ class TicketViewSet(
                 status=status.HTTP_200_OK,
             )
             
-        except Exception as e:
+        except Exception:
             return Response(
-                {"error": f"Error al obtener tickets: {str(e)}"},
+                {"error": "Error interno del servidor"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
