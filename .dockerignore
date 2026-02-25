@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+.github
+
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.pytest_cache
+.coverage
+htmlcov
+
+
+# Virtual environments
+.venv
+venv
+ENV
+env
+
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+
+# Documentation
+*.md
+ARCHITECTURE.md
+README.md
+USERSTORIES_Y_CRITERIOS_ACEPTACION.md
+DOLORES.md
+
+
+# Development
+docker-compose.yml
+Dockerfile
+.dockerignore
+pytest.ini
+conftest.py
+check_deprecated_usage.py
+
+
+# Implementation and plans
+implementation/
+plans/
+
+
+# Tests (opcional, descomentar si no quieres tests en producción)
+# tickets/tests/
+
+
+

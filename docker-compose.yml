@@ -40,7 +40,6 @@ services:
     ports:
       - "8000:8000"
 
-
   rabbitmq:
     image: rabbitmq:3.13-alpine
     container_name: rabbitmq
