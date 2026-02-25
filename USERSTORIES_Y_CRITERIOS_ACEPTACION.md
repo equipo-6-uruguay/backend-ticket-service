@@ -21,7 +21,7 @@ Resultado esperado: API lista para producción con documentación, pruebas E2E, 
 
 ## 🎯 Objetivos del Producto
 
-- ✅ API con documentación OpenAPI (Swagger) en `/api/docs/`
+- ✅ Documentación de API completamente especificada en ARCHITECTURE.md
 - ✅ Tests E2E validando flujos completos con pytest
 - ✅ Arquitectura DDD pura: todos los cambios pasan por use cases
 - ✅ Semántica HTTP correcta: 404 para recursos no encontrados, 400 para errores de cliente
@@ -31,10 +31,10 @@ Resultado esperado: API lista para producción con documentación, pruebas E2E, 
 
 ## 📦 Épicas
 
-### **ÉPICA 1: API REST Profesional & Documentada**
-Transformar API a nivel producción con documentación autodescubrible y validación E2E.
+### **ÉPICA 1: API REST Profesional & Validada**
+Validar API a nivel producción con tests E2E (documentación ya existe en ARCHITECTURE.md).
 
-**Valor:** Devs pueden onboarden sin leer código, API validada con flujos completos.
+**Valor:** API validada con flujos completos, developers pueden confiar en la especificación de ARCHITECTURE.md.
 
 ### **ÉPICA 2: Refactoring Arquitectónico DDD/EDA**
 Cerrar brechas arquitectónicas que permiten bypass del dominio, corregir semántica HTTP y reforzar resiliencia.
@@ -45,57 +45,15 @@ Cerrar brechas arquitectónicas que permiten bypass del dominio, corregir semán
 
 # 📝 HISTORIAS DE USUARIO
 
-## ÉPICA 1: API REST Profesional & Documentada
+## ÉPICA 1: API REST Profesional & Validada
 
 ---
 
-## STORY-1.1 — Documentación OpenAPI/Swagger autodescubrible
-
-**Como** desarrollador consumidor de la API  
-**quiero** acceder a `/api/docs/` y ver documentación interactiva automática  
-**para** explorar endpoints sin leer código, probar requests en tiempo real
-
-### Criterios de Aceptación (Gherkin)
-
-```gherkin
-@epic:API-REST-PRO @story:STORY-1.1 @priority:alta @risk:bajo
-Feature: Documentación OpenAPI/Swagger autodescubrible
-  Como desarrollador consumidor de la API
-  Quiero acceder a documentación interactiva Swagger/Redoc
-  Para explorar endpoints sin leer código
-
-  Scenario: Acceder a Swagger UI en /api/docs/
-    Given que el servidor está corriendo en http://localhost:8000
-    When accedo a GET /api/docs/
-    Then recibo status 200
-    And la respuesta contiene HTML con interfaz Swagger UI
-    And puedo ver todos los endpoints listos: GET/POST /api/v1/tickets/, POST /api/v1/tickets/{id}/change_status/, etc.
-
-  Scenario: Probar endpoint directamente desde Swagger
-    Given estoy en la interfaz Swagger UI en /api/docs/
-    When hago click en "Try it out" en POST /api/v1/tickets/
-    And ingreso {"title": "Bug", "description": "Test", "user_id": "user1"}
-    And presiono "Execute"
-    Then recibo response 201 Created
-    And veo el ticket creado con id, created_at, estado OPEN
-
-  Scenario: Acceso a documentación OpenAPI en JSON
-    Given que el servidor está corriendo
-    When accedo a GET /api/schema/
-    Then recibo status 200 con Content-Type: application/json
-    And la respuesta contiene especificación OpenAPI 3.0 completa
-    And todos los endpoints están documentados con params, ejemplos, códigos de respuesta
-```
-
-### Notas
-- **Valor de negocio:** Onboarding de devs externos → reducción de tickets de "¿cómo uso la API?"
-- **Decisión:** Usar `drf-spectacular` (librería DRF, estándar moderno)
-- **Supuestos confirmados:** `drf-spectacular` está disponible en requirements
-- **Dependencias:** Ninguna
+**Nota:** La especificación completa de todos los endpoints se encuentra en [ARCHITECTURE.md — Especificación de Endpoints API](ARCHITECTURE.md#9-especificación-de-endpoints-api).
 
 ---
 
-## STORY-1.2 — Tests E2E validando flujos completos (pytest)
+## STORY-1.1 — Tests E2E validando flujos completos (pytest)
 
 **Como** QA  
 **quiero** ejecutar tests que validen flujos completos (crear → actualizar → cerrar ticket)  
@@ -104,11 +62,14 @@ Feature: Documentación OpenAPI/Swagger autodescubrible
 ### Criterios de Aceptación (Gherkin)
 
 ```gherkin
-@epic:API-REST-PRO @story:STORY-1.2 @priority:alta @risk:bajo
+@epic:API-REST-PRO @story:STORY-1.1 @priority:alta @risk:bajo
 Feature: Tests E2E de flujos completos (pytest)
   Como QA
   Quiero tests E2E que validen flujos del usuario
   Para garantizar integración completa
+
+  Background:
+    Given la especificación de endpoints está definida en ARCHITECTURE.md
 
   Scenario: Flujo completo: Crear → Cambiar estado → Cerrar ticket
     Given que tengo credenciales válidas
@@ -118,31 +79,31 @@ Feature: Tests E2E de flujos completos (pytest)
       | user_id | user1 |
     Then recibo status 201 con id=1, status=OPEN
 
-    When cambio estado a IN_PROGRESS con PATCH /api/v1/tickets/1/change_status/:
+    When cambio estado a IN_PROGRESS con PATCH /api/v1/tickets/1/status/:
       | status | IN_PROGRESS |
     Then recibo status 200 con status=IN_PROGRESS
 
-    When cambio state a CLOSED con PATCH /api/v1/tickets/1/change_status/:
+    When cambio estado a CLOSED con PATCH /api/v1/tickets/1/status/:
       | status | CLOSED |
     Then recibo status 200 con status=CLOSED
 
   Scenario: Flujo con prioridad y respuestas
-    When creo ticket y lo cambio a priority Medium con PATCH /api/v1/tickets/1/change_priority/:
+    When creo ticket y lo cambio a priority Medium con PATCH /api/v1/tickets/1/priority/:
       | priority | Medium |
       | priority_justification | Cliente importante |
     Then recibo status 200 con priority=Medium
 
-    When agrego una respuesta con POST /api/v1/tickets/1/add_response/:
+    When agrego una respuesta con POST /api/v1/tickets/1/responses/:
       | response_text | El equipo está investigando |
     Then recibo status 201
     And GET /api/v1/tickets/1/ incluye la respuesta
 
   Scenario: Validación de errores en flujo
     Given que creo un ticket en OPEN
-    When intento cambiar estado inversamente (CLOSED → OPEN) con PATCH /api/v1/tickets/1/change_status/:
+    When intento cambiar estado inversamente (CLOSED → OPEN) con PATCH /api/v1/tickets/1/status/:
       | status | OPEN |
     Then recibo status 400
-    And el error es: {"detail": "No se puede cambiar ticket CLOSED a OPEN"}
+    And el error es: {"error": "No se puede cambiar ticket CLOSED a OPEN"}
 
   Scenario: E2E con 500+ tickets (performance)
     Given existen 500 tickets en BD
@@ -154,8 +115,9 @@ Feature: Tests E2E de flujos completos (pytest)
 ### Notas
 - **Valor de negocio:** Confianza pre-deployment, detección de regressions, documentación viva
 - **Decisión confirmada:** Usar pytest + fixtures + librería `requests`
-- **Supuestos confirmados:** Tests en `tickets/tests/integration/test_e2e.py`
-- **Dependencias:** STORY-1.1 debe estar completa
+- **Supuestos confirmados:** Tests en `tickets/tests/e2e/test_ticket_lifecycle.py`
+- **Documentación de endpoints:** Ver [ARCHITECTURE.md — Especificación de Endpoints API](ARCHITECTURE.md#9-especificación-de-endpoints-api)
+- **Dependencias:** Ninguna
 
 ---
 
@@ -385,7 +347,6 @@ Todas las historias están validadas INVEST:
 | Story | I | N | V | E | S | T | Estado |
 |-------|---|---|---|---|---|---|--------|
 | STORY-1.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Aprobada |
-| STORY-1.2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Aprobada |
 | US-001 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Aprobada |
 | US-002 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Aprobada |
 | US-003 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Aprobada |
@@ -394,13 +355,12 @@ Todas las historias están validadas INVEST:
 
 ## 🗺 Resumen por Épica
 
-### **ÉPICA 1: API REST Profesional & Documentada (2 historias)**
+### **ÉPICA 1: API REST Profesional & Validada (1 historia)**
 
 | Story | Descripción | Esfuerzo | Dependencias |
-|-------|-------------|----------|-------------|
-| STORY-1.1 | Documentación OpenAPI (drf-spectacular) | 2-3 d | Ninguna |
-| STORY-1.2 | Tests E2E (pytest) | 3-4 d | STORY-1.1 |
-| **Total ÉPICA 1** | **API validada** | **5-7 días** | **Secuencial** |
+|-------|-------------|----------|-------------||
+| STORY-1.1 | Tests E2E (pytest) | 3-4 d | Ninguna |
+| **Total ÉPICA 1** | **API validada** | **3-4 días** | **Independiente** |
 
 ### **ÉPICA 2: Refactoring Arquitectónico DDD/EDA (3 historias)**
 
@@ -413,18 +373,17 @@ Todas las historias están validadas INVEST:
 
 ### **TOTAL PROYECTO**
 
-- **Total de historias:** 5 (2 funcionales + 3 arquitectónicas)
-- **Esfuerzo estimado:** 7-10.5 días de desarrollo
-- **Timeline realista:** 2-3 semanas (1 developer full-time)
-- **Resultado:** API documentada, validada con E2E, y con arquitectura DDD reforzada
+- **Total de historias:** 4 (1 funcional + 3 arquitectónicas)
+- **Esfuerzo estimado:** 5-8.5 días de desarrollo
+- **Timeline realista:** 1-2 semanas (1 developer full-time)
+- **Resultado:** API documentada en ARCHITECTURE.md, validada con E2E, y con arquitectura DDD reforzada
 
 ---
 
 ## 📌 Orden de Ejecución Recomendado
 
-### **Fase 1: API Profesional (~1 semana)**
-- ✅ STORY-1.1 (OpenAPI) — Backend Dev
-- ✅ STORY-1.2 (E2E Tests) — valida STORY-1.1
+### **Fase 1: API Profesional & Validada (~3-4 días)**
+- ✅ STORY-1.1 (E2E Tests) — Valida endpoints especificados en ARCHITECTURE.md
 
 ### **Fase 2: Refactoring Arquitectónico DDD/EDA (~3-4 días)**
 - ✅ US-001 (Deshabilitar PUT/PATCH/DELETE) — Refuerza arquitectura DDD
@@ -437,7 +396,7 @@ Todas las historias están validadas INVEST:
 
 Este documento define 5 historias de usuario enfocadas en asegurar:
 
-1. ✅ **API profesional** con documentación autodescubrible (OpenAPI/Swagger)
+1. ✅ **Documentación de API** completa y centralizada en ARCHITECTURE.md
 2. ✅ **Validación completa** mediante tests E2E
 3. ✅ **Integridad arquitectónica DDD/EDA** sin bypasses al dominio
 4. ✅ **Semántica HTTP correcta** (404 vs 400)

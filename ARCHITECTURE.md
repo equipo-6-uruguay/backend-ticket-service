@@ -309,6 +309,411 @@ tests/
 
 ---
 
+## 9. Especificación de Endpoints API
+
+### Base URL
+
+```
+http://localhost:8000/api/v1
+```
+
+### Autenticación
+
+Todos los endpoints requieren autenticación JWT mediante cookie HttpOnly `access_token`.
+
+---
+
+### 📋 Tickets: Listar
+
+#### GET /tickets/
+
+**Descripción:** Lista todos los tickets con paginación.
+
+**Query Parameters:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|----------|-------------|
+| `page` | integer | No | Número de página (default: 1) |
+| `page_size` | integer | No | Elementos por página (default: 20, max: 100) |
+| `user_id` | string | No | Filtrar tickets por usuario |
+| `status` | string | No | Filtrar por estado: `OPEN`, `IN_PROGRESS`, `CLOSED` |
+| `priority` | string | No | Filtrar por prioridad: `Low`, `Medium`, `High` |
+
+**Response 200 OK:**
+
+```json
+{
+  "count": 150,
+  "next": "http://localhost:8000/api/v1/tickets/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "title": "Bug crítico",
+      "description": "Sistema no inicia",
+      "status": "OPEN",
+      "priority": "High",
+      "user_id": "user1",
+      "created_at": "2026-02-25T10:30:00Z",
+      "updated_at": "2026-02-25T10:30:00Z"
+    }
+  ]
+}
+```
+
+**Response 401 Unauthorized:** Falta token o token inválido.
+
+---
+
+### 🆕 Tickets: Crear
+
+#### POST /tickets/
+
+**Descripción:** Crea un nuevo ticket.
+
+**Request Body:**
+
+```json
+{
+  "title": "Bug crítico",
+  "description": "Sistema no inicia en producción",
+  "user_id": "user1"
+}
+```
+
+**Validación:**
+
+- `title`: requerido, string, max 255 caracteres, sin HTML tags
+- `description`: requerido, string, max 2000 caracteres, sin HTML tags
+- `user_id`: requerido, string, max 100 caracteres
+
+**Response 201 Created:**
+
+```json
+{
+  "id": 42,
+  "title": "Bug crítico",
+  "description": "Sistema no inicia en producción",
+  "status": "OPEN",
+  "priority": "Unassigned",
+  "priority_justification": null,
+  "user_id": "user1",
+  "created_at": "2026-02-25T10:35:00Z",
+  "updated_at": "2026-02-25T10:35:00Z"
+}
+```
+
+**Response 400 Bad Request:**
+
+```json
+{
+  "error": "Mensaje descriptivo del error de validación"
+}
+```
+
+**Eventos Publicados:** `TicketCreated`
+
+---
+
+### 📖 Tickets: Obtener
+
+#### GET /tickets/{id}/
+
+**Descripción:** Obtiene detalles de un ticket específico.
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `id` | integer | ID del ticket |
+
+**Response 200 OK:**
+
+```json
+{
+  "id": 1,
+  "title": "Bug crítico",
+  "description": "Sistema no inicia",
+  "status": "IN_PROGRESS",
+  "priority": "High",
+  "priority_justification": "Cliente VIP",
+  "user_id": "user1",
+  "created_at": "2026-02-24T14:00:00Z",
+  "updated_at": "2026-02-25T10:00:00Z",
+  "responses": [
+    {
+      "id": 10,
+      "text": "Equipo investigando",
+      "admin_id": "admin1",
+      "created_at": "2026-02-25T09:00:00Z"
+    }
+  ]
+}
+```
+
+**Response 404 Not Found:** Ticket no existe.
+
+```json
+{
+  "error": "Ticket 999 no encontrado"
+}
+```
+
+---
+
+### 🔄 Tickets: Cambiar Estado
+
+#### PATCH /tickets/{id}/status/
+
+**Descripción:** Cambia el estado del ticket.
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `id` | integer | ID del ticket |
+
+**Request Body:**
+
+```json
+{
+  "status": "IN_PROGRESS"
+}
+```
+
+**Estados Válidos:** `OPEN`, `IN_PROGRESS`, `CLOSED`
+
+**Transiciones Permitidas:**
+- `OPEN` → `IN_PROGRESS`
+- `OPEN` → `CLOSED`
+- `IN_PROGRESS` → `CLOSED`
+
+**Response 200 OK:**
+
+```json
+{
+  "id": 1,
+  "status": "IN_PROGRESS",
+  "updated_at": "2026-02-25T10:40:00Z"
+}
+```
+
+**Response 400 Bad Request:**
+
+```json
+{
+  "error": "No se puede cambiar ticket CLOSED a OPEN"
+}
+```
+
+**Response 404 Not Found:** Ticket no existe.
+
+**Eventos Publicados:** `TicketStatusChanged`
+
+---
+
+### 🎯 Tickets: Cambiar Prioridad
+
+#### PATCH /tickets/{id}/priority/
+
+**Descripción:** Cambia la prioridad del ticket (solo ADMIN).
+
+**Autorización:** Requiere rol `ADMIN`
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `id` | integer | ID del ticket |
+
+**Request Body:**
+
+```json
+{
+  "priority": "High",
+  "priority_justification": "Cliente VIP solicitó escalada"
+}
+```
+
+**Prioridades Válidas:** `Low`, `Medium`, `High`
+
+**Validación:**
+
+- `priority`: requerido, enum
+- `priority_justification`: requerido si `priority != "Unassigned"`, max 500 caracteres, sin HTML tags
+- No puede volver a `Unassigned` una vez asignada
+
+**Response 200 OK:**
+
+```json
+{
+  "id": 1,
+  "priority": "High",
+  "priority_justification": "Cliente VIP solicitó escalada",
+  "updated_at": "2026-02-25T10:45:00Z"
+}
+```
+
+**Response 400 Bad Request:**
+
+```json
+{
+  "error": "Campo 'priority_justification' es requerido"
+}
+```
+
+**Response 403 Forbidden:** Usuario no tiene permisos (no es ADMIN).
+
+```json
+{
+  "error": "No tienes permisos para cambiar la prioridad"
+}
+```
+
+**Response 404 Not Found:** Ticket no existe.
+
+**Eventos Publicados:** `TicketPriorityChanged`
+
+---
+
+### 💬 Tickets: Agregar Respuesta
+
+#### POST /tickets/{id}/responses/
+
+**Descripción:** Agrega una respuesta al ticket (solo ADMIN).
+
+**Autorización:** Requiere rol `ADMIN`
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `id` | integer | ID del ticket |
+
+**Request Body:**
+
+```json
+{
+  "response_text": "Equipo está investigando el problema",
+  "admin_id": "admin1"
+}
+```
+
+**Validación:**
+
+- `response_text`: requerido, string, max 1000 caracteres, sin HTML tags
+- `admin_id`: requerido, string, max 100 caracteres
+
+**Response 201 Created:**
+
+```json
+{
+  "id": 15,
+  "ticket_id": 1,
+  "response_text": "Equipo está investigando el problema",
+  "admin_id": "admin1",
+  "created_at": "2026-02-25T10:50:00Z"
+}
+```
+
+**Response 400 Bad Request:**
+
+```json
+{
+  "error": "Campo 'response_text' es requerido"
+}
+```
+
+**Response 403 Forbidden:** Usuario no tiene permisos (no es ADMIN).
+
+**Response 404 Not Found:** Ticket no existe.
+
+**Eventos Publicados:** `TicketResponseAdded`
+
+---
+
+### 📍 Tickets: Listar por Usuario
+
+#### GET /tickets/my-tickets/{user_id}/
+
+**Descripción:** Lista todos los tickets de un usuario específico.
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `user_id` | string | ID del usuario |
+
+**Query Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `page` | integer | Número de página (default: 1) |
+| `page_size` | integer | Elementos por página (default: 20) |
+| `status` | string | Filtrar por estado |
+
+**Response 200 OK:**
+
+```json
+{
+  "count": 15,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "title": "Bug crítico",
+      "status": "IN_PROGRESS",
+      "priority": "High",
+      "user_id": "user1",
+      "created_at": "2026-02-24T14:00:00Z"
+    }
+  ]
+}
+```
+
+**Response 404 Not Found:** Usuario no existe.
+
+**Response 500 Internal Server Error:** Error inesperado en el servidor.
+
+---
+
+### 📊 Códigos de Respuesta HTTP
+
+| Código | Significado | Caso de Uso |
+|--------|-------------|-------------|
+| `200` | OK | Operación exitosa (GET, PATCH exitosos) |
+| `201` | Created | Recurso creado (POST exitoso) |
+| `400` | Bad Request | Validación fallida, datos inválidos, transición no permitida |
+| `401` | Unauthorized | Token faltante o expirado |
+| `403` | Forbidden | Usuario autenticado pero sin permisos |
+| `404` | Not Found | Recurso no encontrado |
+| `500` | Internal Server Error | Error inesperado en el servidor (no capturado) |
+
+---
+
+### 🔒 Manejo de Errores
+
+**Errores Esperados (4xx):**
+
+```json
+{
+  "error": "Descripción específica del problema"
+}
+```
+
+**Errores del Servidor (5xx):**
+
+```json
+{
+  "error": "Error interno del servidor"
+}
+```
+
+*Nota: Los errores 500 **nunca** exponen stacktraces o detalles técnicos internos en producción.*
+
+---
+
 ## Resumen Ejecutivo
 
 | Categoría de Dolor | # Problemas | Beneficio Principal de Clean Architecture |
