@@ -27,6 +27,7 @@ from .infrastructure.event_publisher import RabbitMQEventPublisher
 from .domain.exceptions import (
     DomainException,
     TicketAlreadyClosed,
+    TicketNotFoundException,
     InvalidTicketData,
     DangerousInputError,
     EmptyResponseError,
@@ -155,6 +156,12 @@ class TicketViewSet(
                 status=status.HTTP_200_OK,
             )
             
+        except TicketNotFoundException as e:
+            # Ticket no existe: recurso no encontrado
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except TicketAlreadyClosed as e:
             # Ticket cerrado: regla de negocio violada
             return Response(
@@ -162,7 +169,7 @@ class TicketViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as e:
-            # Estado inválido o ticket no encontrado
+            # Estado inválido
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -190,6 +197,7 @@ class TicketViewSet(
         Errores:
             - 400: Campo 'priority' ausente, ticket cerrado, transición inválida.
             - 403: Permiso denegado (excepción de dominio).
+            - 404: Ticket no encontrado.
         """
         new_priority = request.data.get("priority")
         justification = request.data.get("justification")
@@ -227,6 +235,12 @@ class TicketViewSet(
                 status=status.HTTP_200_OK,
             )
 
+        except TicketNotFoundException as e:
+            # Ticket no existe: recurso no encontrado
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except (TicketAlreadyClosed, InvalidPriorityTransition) as e:
             # Regla de negocio violada: ticket cerrado o transición de prioridad inválida
             return Response(
@@ -234,7 +248,7 @@ class TicketViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as e:
-            # Valor inválido o ticket no encontrado
+            # Valor inválido
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -354,7 +368,7 @@ class TicketViewSet(
 
         Returns:
             Response 201 con la respuesta creada, 403 si no es ADMIN,
-            o 400 ante error de dominio.
+            400 ante error de dominio, o 404 si el ticket no existe.
 
         Raises:
             No lanza excepciones; todas se traducen a respuestas HTTP.
@@ -404,7 +418,12 @@ class TicketViewSet(
         except Ticket.DoesNotExist:
             return Response(
                 {"error": f"Ticket {ticket_id} no encontrado"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except TicketNotFoundException as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
             )
         except TicketAlreadyClosed as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -22,7 +22,8 @@ from tickets.domain.exceptions import (
     InvalidTicketStateTransition,
     InvalidTicketData,
     InvalidPriorityTransition,
-    DomainException
+    DomainException,
+    TicketNotFoundException,
 )
 from tickets.application.use_cases import (
     CreateTicketUseCase,
@@ -425,14 +426,14 @@ class TestCompleteTicketWorkflow(TestCase):
         assert count == 0
 
     def test_nonexistent_ticket_change_status_fails_gracefully(self):
-        """Test: Attempting to change status of non-existent ticket raises ValueError."""
+        """Test: Attempting to change status of non-existent ticket raises TicketNotFoundException."""
         change_use_case = ChangeTicketStatusUseCase(
             self.repository,
             self.event_publisher
         )
 
         # Try to change status of non-existent ticket
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TicketNotFoundException):
             change_use_case.execute(
                 ChangeTicketStatusCommand(
                     ticket_id=99999,
@@ -440,6 +441,21 @@ class TestCompleteTicketWorkflow(TestCase):
                 )
             )
 
+    def test_nonexistent_ticket_change_priority_returns_404(self):
+        """Test: Attempting to change priority of non-existent ticket raises TicketNotFoundException."""
+        change_priority_use_case = ChangeTicketPriorityUseCase(
+            repository=self.repository,
+            event_publisher=self.event_publisher
+        )
+        command = ChangeTicketPriorityCommand(
+            ticket_id=99999,
+            new_priority="High",
+        )
+        command.user_role = "Administrador"
+
+        with self.assertRaises(TicketNotFoundException):
+            change_priority_use_case.execute(command)
+    
     # ==================== Clean Architecture Validation ====================
 
     def test_use_case_depends_on_abstractions_not_implementations(self):

@@ -14,7 +14,13 @@ from unittest.mock import Mock, patch
 
 from tickets.models import Ticket as DjangoTicket
 from tickets.domain.entities import Ticket as DomainTicket
-from tickets.domain.exceptions import TicketAlreadyClosed, InvalidTicketData, InvalidPriorityTransition, DomainException
+from tickets.domain.exceptions import (
+    TicketAlreadyClosed,
+    TicketNotFoundException,
+    InvalidTicketData,
+    InvalidPriorityTransition,
+    DomainException,
+)
 from tickets.views import TicketViewSet
 from tickets.serializer import TicketSerializer
 from datetime import datetime
@@ -260,6 +266,28 @@ class TestTicketViewSet(TestCase):
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_change_status_ticket_not_found_returns_404(self):
+        """ViewSet devuelve 404 cuando change_status recibe TicketNotFoundException."""
+        django_ticket = DjangoTicket.objects.create(
+            title="Test",
+            description="Desc",
+            status="OPEN"
+        )
+
+        viewset = TicketViewSet()
+
+        # Mockear caso de uso para que lance TicketNotFoundException
+        mock_use_case = Mock()
+        mock_use_case.execute.side_effect = TicketNotFoundException(99999)
+        viewset.change_status_use_case = mock_use_case
+
+        request = self.factory.patch('', {"status": "IN_PROGRESS"})
+
+        response = viewset.change_status(request, pk=99999)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "no encontrado" in str(response.data['error']).lower()
+
     # ── Phase 5: change_priority endpoint tests (RED) ──────────────────
 
     def test_change_priority_endpoint_executes_use_case(self):
@@ -372,6 +400,27 @@ class TestTicketViewSet(TestCase):
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_change_priority_ticket_not_found_returns_404(self):
+        """ViewSet devuelve 404 cuando change_priority recibe TicketNotFoundException."""
+        django_ticket = DjangoTicket.objects.create(
+            title="Test",
+            description="Desc",
+            status="OPEN"
+        )
+
+        viewset = TicketViewSet()
+
+        mock_use_case = Mock()
+        mock_use_case.execute.side_effect = TicketNotFoundException(99999)
+        viewset.change_priority_use_case = mock_use_case
+
+        request = self._make_drf_request(self.factory.patch('', {"priority": "High", "user_role": "Administrador"}))
+
+        response = viewset.change_priority(request, pk=99999)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "no encontrado" in str(response.data['error']).lower()
+
     def test_change_priority_passes_justification_to_use_case(self):
         """Endpoint change_priority pasa justificación al caso de uso."""
         django_ticket = DjangoTicket.objects.create(
@@ -440,6 +489,25 @@ class TestTicketViewSet(TestCase):
         assert response.data['priority'] == "High"
         assert response.data.get('priority_justification') == "Urgente"
 
+    def test_create_response_ticket_not_found_returns_404(self):
+        """ViewSet devuelve 404 cuando _create_response opera sobre ticket inexistente."""
+        viewset = TicketViewSet()
+
+        # Simular un request de ADMIN con datos válidos
+        request = self._make_drf_request(
+            self.factory.post('', {"text": "Respuesta", "admin_id": "admin-001"}, format="json")
+        )
+
+        # Mock del user con token ADMIN
+        mock_user = Mock()
+        mock_user.token = {"role": "ADMIN"}
+        request._user = mock_user
+
+        response = viewset._create_response(request, ticket_id="99999")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "no encontrado" in str(response.data['error']).lower()
+
 
 class TestTicketSerializer(TestCase):
     """Tests del TicketSerializer: validación de campos requeridos e integración de priority."""
@@ -491,7 +559,6 @@ class TestTicketSerializer(TestCase):
         ticket = DjangoTicket.objects.create(
             title="Test Justification",
             description="Descripción",
-            priority="High",
             priority_justification="Urgente",
         )
         serializer = TicketSerializer(instance=ticket)
@@ -525,12 +592,12 @@ class TestTicketModel(TestCase):
         
         assert ticket.status == "OPEN"
         assert ticket.created_at is not None
-    
+
     def test_ticket_model_can_be_updated(self):
         """Modelo Django permite actualizaciones."""
         ticket = DjangoTicket.objects.create(
             title="Original",
-            description="Original Desc",
+            description="Desc",
             status="OPEN"
         )
         

@@ -52,9 +52,6 @@ Ensure:
 - A Test Plan exists for that Story ID
 - The Test Plan metadata Story ID matches
 
-If mismatch detected:
-Return:
-[BLOCKED: Story/Test Plan mismatch]
 
 STEP 0.5 — Extract Target Story
 
