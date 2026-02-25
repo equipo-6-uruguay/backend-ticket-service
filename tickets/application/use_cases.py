@@ -11,7 +11,7 @@ from ..domain.factories import TicketFactory
 from ..domain.repositories import TicketRepository
 from ..domain.event_publisher import EventPublisher
 from ..domain.events import TicketCreated, TicketStatusChanged, TicketResponseAdded
-from ..domain.exceptions import TicketAlreadyClosed, DomainException
+from ..domain.exceptions import TicketAlreadyClosed, DomainException, TicketNotFoundException
 
 
 @dataclass
@@ -141,14 +141,15 @@ class ChangeTicketStatusUseCase:
             El ticket actualizado
             
         Raises:
-            ValueError: Si el ticket no existe o el estado es inválido
+            TicketNotFoundException: Si el ticket no existe
+            ValueError: Si el estado es inválido
             TicketAlreadyClosed: Si el ticket está cerrado
         """
         # 1. Obtener el ticket
         ticket = self.repository.find_by_id(command.ticket_id)
         
         if not ticket:
-            raise ValueError(f"Ticket {command.ticket_id} no encontrado")
+            raise TicketNotFoundException(command.ticket_id)
         
         # 2. Aplicar cambio de estado (reglas de negocio en la entidad)
         ticket.change_status(command.new_status)
@@ -201,7 +202,7 @@ class ChangeTicketPriorityUseCase:
             El ticket actualizado
             
         Raises:
-            ValueError: Si el ticket no existe
+            TicketNotFoundException: Si el ticket no existe
         """
         user_role = getattr(command, "user_role", None)
         if user_role is not None and user_role != "Administrador":
@@ -211,7 +212,7 @@ class ChangeTicketPriorityUseCase:
         ticket = self.repository.find_by_id(command.ticket_id)
         
         if not ticket:
-            raise ValueError(f"Ticket {command.ticket_id} no encontrado")
+            raise TicketNotFoundException(command.ticket_id)
         
         # 2. Aplicar cambio de prioridad (reglas de negocio en la entidad)
         justification = getattr(command, "justification", None)
@@ -274,7 +275,7 @@ class AddTicketResponseUseCase:
             El ticket actualizado
 
         Raises:
-            ValueError: Si el ticket no existe
+            TicketNotFoundException: Si el ticket no existe
             TicketAlreadyClosed: Si el ticket está cerrado
             EmptyResponseError: Si el texto está vacío
         """
@@ -282,7 +283,7 @@ class AddTicketResponseUseCase:
         ticket = self.repository.find_by_id(command.ticket_id)
 
         if not ticket:
-            raise ValueError(f"Ticket {command.ticket_id} no encontrado")
+            raise TicketNotFoundException(command.ticket_id)
 
         # 2. Aplicar la operación de dominio (add_response)
         ticket.add_response(command.text, command.admin_id)
