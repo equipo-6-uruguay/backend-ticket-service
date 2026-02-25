@@ -114,10 +114,6 @@ Clarifications Required
 
 NEEDS CLARIFICATION markers
 
-If Test Plan missing:
-Return:
-[BLOCKED: Missing Test Plan]
-
 If Story ID mismatch with Gherkin:
 Return:
 [BLOCKED: Story/Test Plan mismatch]
