@@ -16,6 +16,7 @@ services:
       timeout: 5s
       retries: 5
 
+
   backend:
     build: .
     container_name: sistema-tickets-backend
@@ -42,10 +43,19 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-alpine
     container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
       - "5672:5672"
-
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db_data:
-
+  rabbitmq_data:
