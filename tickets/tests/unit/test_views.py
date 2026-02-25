@@ -288,6 +288,70 @@ class TestTicketViewSet(TestCase):
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "no encontrado" in str(response.data['error']).lower()
 
+    # ── Generic 500 error handling tests ───────────────────────────────
+
+    def test_change_status_unexpected_exception_returns_500(self):
+        """ViewSet devuelve 500 genérico cuando change_status lanza excepción inesperada."""
+        django_ticket = DjangoTicket.objects.create(
+            title="Test",
+            description="Desc",
+            status="OPEN"
+        )
+
+        viewset = TicketViewSet()
+
+        mock_use_case = Mock()
+        mock_use_case.execute.side_effect = RuntimeError("DB connection lost")
+        viewset.change_status_use_case = mock_use_case
+
+        request = self.factory.patch('', {"status": "IN_PROGRESS"})
+
+        response = viewset.change_status(request, pk=django_ticket.id)
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {"error": "Error interno del servidor"}
+        assert "DB connection lost" not in str(response.data)
+
+    def test_change_priority_unexpected_exception_returns_500(self):
+        """ViewSet devuelve 500 genérico cuando change_priority lanza excepción inesperada."""
+        django_ticket = DjangoTicket.objects.create(
+            title="Test",
+            description="Desc",
+            status="OPEN"
+        )
+
+        viewset = TicketViewSet()
+
+        mock_use_case = Mock()
+        mock_use_case.execute.side_effect = RuntimeError("RabbitMQ timeout")
+        viewset.change_priority_use_case = mock_use_case
+
+        request = self._make_drf_request(
+            self.factory.patch('', {"priority": "High", "user_role": "Administrador"})
+        )
+
+        response = viewset.change_priority(request, pk=django_ticket.id)
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {"error": "Error interno del servidor"}
+        assert "RabbitMQ timeout" not in str(response.data)
+
+    @patch("tickets.views.Ticket.objects")
+    def test_my_tickets_unexpected_exception_returns_generic_500(self, mock_objects):
+        """ViewSet devuelve 500 genérico cuando my_tickets lanza excepción inesperada."""
+        mock_objects.filter.side_effect = RuntimeError("simulated DB failure")
+
+        viewset = TicketViewSet()
+
+        request = self.factory.get('')
+
+        response = viewset.my_tickets(request, user_id="user-123")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {"error": "Error interno del servidor"}
+        assert "simulated" not in str(response.data)
+        assert "Error al obtener tickets" not in str(response.data)
+
     # ── Phase 5: change_priority endpoint tests (RED) ──────────────────
 
     def test_change_priority_endpoint_executes_use_case(self):
