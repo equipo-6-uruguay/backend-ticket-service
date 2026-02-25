@@ -17,10 +17,13 @@ from tickets.domain.exceptions import (
     InvalidTicketData,
     InvalidTicketStateTransition,
     TicketAlreadyClosed,
+    TicketNotFoundException,
 )
 from tickets.domain.factories import TicketFactory
 
 from tickets.application.use_cases import (
+    AddTicketResponseCommand,
+    AddTicketResponseUseCase,
     CreateTicketUseCase,
     CreateTicketCommand,
     ChangeTicketStatusUseCase,
