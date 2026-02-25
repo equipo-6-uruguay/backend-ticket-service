@@ -29,6 +29,14 @@ class TicketAlreadyClosed(DomainException):
         )
 
 
+class TicketNotFoundException(DomainException):
+    """Se lanza cuando se intenta operar sobre un ticket que no existe."""
+
+    def __init__(self, ticket_id: int):
+        self.ticket_id = ticket_id
+        super().__init__(f"Ticket {ticket_id} no encontrado")
+
+
 class InvalidTicketData(DomainException):
     """Se lanza cuando los datos del ticket son inválidos."""
     pass
