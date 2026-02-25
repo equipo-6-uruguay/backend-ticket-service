@@ -1,7 +1,7 @@
 ---
 name: Implement
 description: Executes implementation.md by applying real code changes, creating commits, pushing branch and opening PR.
-model: Raptor mini (Preview) (copilot)
+model: Claude Opus 4.6 (copilot)
 tools: [
   'vscode',
   'execute',
