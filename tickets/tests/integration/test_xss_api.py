@@ -6,7 +6,7 @@ verificando que los payloads maliciosos sean rechazados con HTTP 400
 y que los tickets legítimos se guarden correctamente.
 """
 
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -96,7 +96,8 @@ class TestTicketAPIXSSValidation(TestCase):
         # Verify: No se guardó en la base de datos
         assert DjangoTicket.objects.count() == 0
     
-    def test_scenario_valid_title_and_description_are_accepted(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_scenario_valid_title_and_description_are_accepted(self, mock_publisher_cls, mock_auth):
         """
         Scenario: Título y descripción válidos son aceptados
         
@@ -106,6 +107,7 @@ class TestTicketAPIXSSValidation(TestCase):
         Then recibe respuesta HTTP 201 Created
         And el ticket se almacena correctamente
         """
+        mock_publisher_cls.return_value = MagicMock()
         payload = {
             "title": "Problema con el login",
             "description": "No puedo iniciar sesión",
@@ -126,7 +128,8 @@ class TestTicketAPIXSSValidation(TestCase):
         assert ticket.user_id == "user123"
         assert ticket.status == "OPEN"
     
-    def test_scenario_special_characters_are_accepted(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_scenario_special_characters_are_accepted(self, mock_publisher_cls, mock_auth):
         """
         Scenario: Caracteres especiales no peligrosos son aceptados
         
@@ -134,6 +137,7 @@ class TestTicketAPIXSSValidation(TestCase):
         When envía POST a "/api/tickets/" con título "Error en versión 2.0 & corrección"
         Then recibe respuesta HTTP 201 Created
         """
+        mock_publisher_cls.return_value = MagicMock()
         payload = {
             "title": "Error en versión 2.0 & corrección",
             "description": "El sistema muestra 'Error 404' al acceder",
@@ -243,8 +247,10 @@ class TestTicketAPIXSSValidation(TestCase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert DjangoTicket.objects.count() == 0
     
-    def test_accepts_accented_characters(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_accepts_accented_characters(self, mock_publisher_cls, mock_auth):
         """Acepta texto con tildes y caracteres especiales."""
+        mock_publisher_cls.return_value = MagicMock()
         payload = {
             "title": "Configuración del sistema",
             "description": "La página de configuración está rota después de la última actualización",
@@ -256,8 +262,10 @@ class TestTicketAPIXSSValidation(TestCase):
         assert response.status_code == status.HTTP_201_CREATED
         assert DjangoTicket.objects.count() == 1
     
-    def test_accepts_numbers_and_symbols(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_accepts_numbers_and_symbols(self, mock_publisher_cls, mock_auth):
         """Acepta números, símbolos y puntuación normal."""
+        mock_publisher_cls.return_value = MagicMock()
         payload = {
             "title": "Error #404 - Página no encontrada (v2.3.1)",
             "description": "El servidor retorna código HTTP 404 al intentar acceder a /dashboard/metrics",
@@ -269,8 +277,10 @@ class TestTicketAPIXSSValidation(TestCase):
         assert response.status_code == status.HTTP_201_CREATED
         assert DjangoTicket.objects.count() == 1
     
-    def test_accepts_email_addresses(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_accepts_email_addresses(self, mock_publisher_cls, mock_auth):
         """Acepta direcciones de email en el contenido."""
+        mock_publisher_cls.return_value = MagicMock()
         payload = {
             "title": "Problema con notificaciones",
             "description": "No recibo emails en soporte@ejemplo.com cuando se cierra un ticket",
@@ -299,8 +309,10 @@ class TestTicketAPIXSSValidation(TestCase):
         error_data = response.data
         assert "title" in str(error_data) or "título" in str(error_data).lower()
     
-    def test_multiple_tickets_with_valid_content(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_multiple_tickets_with_valid_content(self, mock_publisher_cls, mock_auth):
         """Puede crear múltiples tickets válidos secuencialmente."""
+        mock_publisher_cls.return_value = MagicMock()
         tickets_data = [
             {
                 "title": "Error en login",
@@ -326,7 +338,8 @@ class TestTicketAPIXSSValidation(TestCase):
         # Verify: 3 tickets creados
         assert DjangoTicket.objects.count() == 3
     
-    def test_get_tickets_does_not_execute_stored_xss(self, mock_auth):
+    @patch("tickets.views.RabbitMQEventPublisher")
+    def test_get_tickets_does_not_execute_stored_xss(self, mock_publisher_cls, mock_auth):
         """
         Verifica que aunque se creara (por algún bypass futuro) un ticket
         con contenido peligroso, el GET lo retorna como texto plano.
@@ -334,6 +347,7 @@ class TestTicketAPIXSSValidation(TestCase):
         Nota: Este test verifica que DRF serializa como JSON (texto plano),
         no como HTML ejecutable.
         """
+        mock_publisher_cls.return_value = MagicMock()
         # Crear ticket válido
         payload = {
             "title": "Ticket de prueba",
