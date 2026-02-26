@@ -265,6 +265,11 @@ class TicketViewSet(
                 {"error": str(e)},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=False, methods=["get"], url_path="my-tickets/(?P<user_id>[^/.]+)")
     def my_tickets(self, request, user_id=None):
