@@ -205,7 +205,7 @@ class TestChangeTicketStatusUseCase:
         use_case = ChangeTicketStatusUseCase(mock_repo, mock_publisher)
         command = ChangeTicketStatusCommand(999, Ticket.IN_PROGRESS)
         
-        with pytest.raises(ValueError, match="no encontrado"):
+        with pytest.raises(TicketNotFoundException):
             use_case.execute(command)
         
         # No debe guardar ni publicar

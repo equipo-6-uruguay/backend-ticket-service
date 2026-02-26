@@ -3,7 +3,7 @@ Tests unitarios de excepciones de dominio.
 Verifican que las excepciones se lanzan correctamente y contienen la información necesaria.
 """
 
-
+import pytest
 from tickets.domain.exceptions import (
     DomainException,
     InvalidTicketStateTransition,

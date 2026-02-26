@@ -3,7 +3,7 @@ Tests unitarios de la entidad Ticket (State Machine).
 Prueban reglas de negocio y transiciones de estados.
 """
 
-
+import pytest
 from datetime import datetime
 
 from tickets.domain.entities import Ticket
@@ -16,7 +16,7 @@ class TestTicketEntity:
     
     def test_create_ticket_with_valid_data(self):
         """Crear un ticket con datos válidos inicia en estado OPEN."""
-        ticket = Ticket.create("Test Title", "Test Description")
+        ticket = Ticket.create("Test Title", "Test Description", "user-1")
         
         assert ticket.title == "Test Title"
         assert ticket.description == "Test Description"
@@ -32,6 +32,7 @@ class TestTicketEntity:
                 title="Test",
                 description="Desc",
                 status="INVALID",
+                user_id="user-1",
                 created_at=datetime.now()
             )
     
@@ -42,6 +43,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -62,6 +64,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.IN_PROGRESS,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -79,6 +82,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.CLOSED,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -95,6 +99,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -111,6 +116,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -124,6 +130,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -142,6 +149,7 @@ class TestTicketEntity:
             title="Test",
             description="Desc",
             status=Ticket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -162,23 +170,25 @@ class TestTicketStateMachine:
     def test_all_valid_state_transitions(self):
         """Todas las transiciones de estado válidas funcionan correctamente."""
         # OPEN -> IN_PROGRESS
-        ticket = Ticket(1, "T", "D", Ticket.OPEN, datetime.now())
+        ticket = Ticket(1, "T", "D", Ticket.OPEN, "user-1", datetime.now())
         ticket.change_status(Ticket.IN_PROGRESS)
         assert ticket.status == Ticket.IN_PROGRESS
         
         # IN_PROGRESS -> CLOSED
-        ticket2 = Ticket(2, "T", "D", Ticket.IN_PROGRESS, datetime.now())
+        ticket2 = Ticket(2, "T", "D", Ticket.IN_PROGRESS, "user-1", datetime.now())
         ticket2.change_status(Ticket.CLOSED)
         assert ticket2.status == Ticket.CLOSED
         
-        # OPEN -> CLOSED (salto directo permitido)
-        ticket3 = Ticket(3, "T", "D", Ticket.OPEN, datetime.now())
+        # OPEN -> CLOSED (salto directo NO permitido - debe ir por IN_PROGRESS)
+        ticket3 = Ticket(3, "T", "D", Ticket.OPEN, "user-1", datetime.now())
+        ticket3.change_status(Ticket.IN_PROGRESS)
+        assert ticket3.status == Ticket.IN_PROGRESS
         ticket3.change_status(Ticket.CLOSED)
         assert ticket3.status == Ticket.CLOSED
     
     def test_closed_is_final_state(self):
         """CLOSED es un estado final, no permite transiciones."""
-        ticket = Ticket(1, "T", "D", Ticket.CLOSED, datetime.now())
+        ticket = Ticket(1, "T", "D", Ticket.CLOSED, "user-1", datetime.now())
         
         # Intentar cualquier transición desde CLOSED falla
         with pytest.raises(TicketAlreadyClosed):
@@ -192,7 +202,7 @@ class TestTicketStateMachine:
     
     def test_state_machine_generates_correct_events(self):
         """La máquina de estados genera eventos correctos en cada transición."""
-        ticket = Ticket(1, "Test", "Desc", Ticket.OPEN, datetime.now())
+        ticket = Ticket(1, "Test", "Desc", Ticket.OPEN, "user-1", datetime.now())
         
         # OPEN -> IN_PROGRESS
         ticket.change_status(Ticket.IN_PROGRESS)

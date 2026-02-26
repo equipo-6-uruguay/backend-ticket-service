@@ -135,6 +135,7 @@ class TestTicketViewSet(TestCase):
             title="Test",
             description="Desc",
             status=DomainTicket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         mock_use_case.execute.return_value = mock_domain_ticket
@@ -166,8 +167,8 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = InvalidTicketData("Título vacío")
         viewset.create_ticket_use_case = mock_use_case
 
-        serializer = TicketSerializer(data={"title": "", "description": "Desc"})
-        serializer.is_valid()
+        serializer = TicketSerializer(data={"title": "Test", "description": "Desc"})
+        serializer.is_valid(raise_exception=True)
 
         # Debe lanzar ValidationError
         from rest_framework.exceptions import ValidationError
@@ -192,6 +193,7 @@ class TestTicketViewSet(TestCase):
             title="Test",
             description="Desc",
             status=DomainTicket.IN_PROGRESS,
+            user_id="user-1",
             created_at=django_ticket.created_at
         )
         mock_use_case.execute.return_value = mock_domain_ticket
