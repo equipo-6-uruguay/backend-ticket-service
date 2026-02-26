@@ -745,10 +745,13 @@ class TestCompleteTicketWorkflow(TestCase):
     # ==================== Disabled Generic CRUD Methods ====================
 
     @patch("tickets.infrastructure.event_publisher.RabbitMQEventPublisher.publish")
-    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate",
-           return_value=None)
+    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate")
     def test_put_generic_returns_405_and_ticket_unchanged(self, mock_auth, mock_publish):
         """Gherkin AC-1: PUT /api/tickets/{id}/ returns 405 and ticket data stays intact."""
+        mock_user = Mock()
+        mock_user.is_authenticated = True
+        mock_auth.return_value = (mock_user, "fake-token")
+
         # Create a ticket directly in DB for isolation
         ticket = DjangoTicket.objects.create(
             title="Original Title",
@@ -774,10 +777,13 @@ class TestCompleteTicketWorkflow(TestCase):
         self.assertEqual(ticket.status, original_status)
 
     @patch("tickets.infrastructure.event_publisher.RabbitMQEventPublisher.publish")
-    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate",
-           return_value=None)
+    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate")
     def test_patch_generic_returns_405_and_ticket_unchanged(self, mock_auth, mock_publish):
         """Gherkin AC-2: PATCH /api/tickets/{id}/ returns 405 and ticket data stays intact."""
+        mock_user = Mock()
+        mock_user.is_authenticated = True
+        mock_auth.return_value = (mock_user, "fake-token")
+
         ticket = DjangoTicket.objects.create(
             title="Original Title",
             description="Original Description",
@@ -798,10 +804,13 @@ class TestCompleteTicketWorkflow(TestCase):
         self.assertEqual(ticket.status, original_status)
 
     @patch("tickets.infrastructure.event_publisher.RabbitMQEventPublisher.publish")
-    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate",
-           return_value=None)
+    @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate")
     def test_delete_generic_returns_405_and_ticket_intact(self, mock_auth, mock_publish):
         """Gherkin AC-3: DELETE /api/tickets/{id}/ returns 405 and ticket still exists."""
+        mock_user = Mock()
+        mock_user.is_authenticated = True
+        mock_auth.return_value = (mock_user, "fake-token")
+
         ticket = DjangoTicket.objects.create(
             title="Should Not Be Deleted",
             description="Persistence check",
