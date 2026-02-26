@@ -3,7 +3,7 @@ Tests unitarios de eventos de dominio.
 Verifican la correcta creación e inmutabilidad de eventos.
 """
 
-
+import pytest
 from datetime import datetime
 from dataclasses import FrozenInstanceError
 
@@ -38,7 +38,8 @@ class TestTicketCreated:
             ticket_id=123,
             title="Test Ticket",
             description="Test Description",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-123"
         )
         
         assert event.occurred_at == now
@@ -54,7 +55,8 @@ class TestTicketCreated:
             ticket_id=1,
             title="Title",
             description="Desc",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         
         with pytest.raises(FrozenInstanceError):
@@ -71,14 +73,16 @@ class TestTicketCreated:
             ticket_id=1,
             title="Title",
             description="Desc",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         event2 = TicketCreated(
             occurred_at=now,
             ticket_id=1,
             title="Title",
             description="Desc",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         
         assert event1 == event2
@@ -90,7 +94,8 @@ class TestTicketCreated:
             ticket_id=1,
             title="T",
             description="D",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         
         assert isinstance(event, DomainEvent)
@@ -188,7 +193,8 @@ class TestEventTimestamps:
             ticket_id=1,
             title="T",
             description="D",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         after = datetime.now()
         
@@ -203,14 +209,16 @@ class TestEventTimestamps:
             ticket_id=1,
             title="T1",
             description="D1",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-1"
         )
         event2 = TicketCreated(
             occurred_at=now,
             ticket_id=2,
             title="T2",
             description="D2",
-            status=Ticket.OPEN
+            status=Ticket.OPEN,
+            user_id="user-2"
         )
         
         assert event1.occurred_at == event2.occurred_at

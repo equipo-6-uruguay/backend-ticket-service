@@ -30,6 +30,7 @@ class TestDjangoTicketRepository(TestCase):
             title="Test Ticket",
             description="Test Description",
             status=DomainTicket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -57,6 +58,7 @@ class TestDjangoTicketRepository(TestCase):
             title="Updated",
             description="Updated Description",
             status=DomainTicket.IN_PROGRESS,
+            user_id="user-1",
             created_at=django_ticket.created_at
         )
         
@@ -241,7 +243,8 @@ class TestRabbitMQEventPublisher(TestCase):
             ticket_id=123,
             title="Test",
             description="Desc",
-            status="OPEN"
+            status="OPEN",
+            user_id="user-123"
         )
         
         # Publicar
@@ -304,7 +307,8 @@ class TestRabbitMQEventPublisher(TestCase):
             ticket_id=1,
             title="T",
             description="D",
-            status="OPEN"
+            status="OPEN",
+            user_id="user-1"
         )
         
         publisher.publish(event)
@@ -323,7 +327,8 @@ class TestRabbitMQEventPublisher(TestCase):
             ticket_id=1,
             title="T",
             description="D",
-            status="OPEN"
+            status="OPEN",
+            user_id="user-1"
         )
         
         # Debe propagar la excepción

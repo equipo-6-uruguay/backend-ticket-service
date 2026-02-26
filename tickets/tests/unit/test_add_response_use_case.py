@@ -13,7 +13,7 @@ from tickets.domain.entities import Ticket
 from tickets.domain.repositories import TicketRepository
 from tickets.domain.event_publisher import EventPublisher
 from tickets.domain.events import TicketResponseAdded
-from tickets.domain.exceptions import TicketAlreadyClosed, EmptyResponseError
+from tickets.domain.exceptions import TicketAlreadyClosed, EmptyResponseError, TicketNotFoundException
 
 from tickets.application.use_cases import (
     AddTicketResponseUseCase,
@@ -134,7 +134,7 @@ class TestAddTicketResponseUseCase:
         )
 
         # Act & Assert
-        with pytest.raises(ValueError):
+        with pytest.raises(TicketNotFoundException):
             use_case.execute(command)
 
     def test_event_published_after_successful_persistence_issue39_ep13(self):

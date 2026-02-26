@@ -50,9 +50,7 @@ class TestTicketViewSetMixinComposition(TestCase):
     def test_viewset_has_no_update_method_from_mixin(self):
         """The 'update' action must not be resolvable on TicketViewSet."""
         viewset = TicketViewSet()
-        actions = getattr(viewset, 'action_map', {})
-        self.assertNotIn('update', dir(UpdateModelMixin))
-        # More robust: ensure no 'update' method inherited from UpdateModelMixin
+        # Ensure no 'update' method inherited from UpdateModelMixin
         self.assertFalse(
             hasattr(viewset, 'update') and 'UpdateModelMixin' in str(type(viewset).update),
             "TicketViewSet must not expose an 'update' action from UpdateModelMixin",
@@ -135,6 +133,7 @@ class TestTicketViewSet(TestCase):
             title="Test",
             description="Desc",
             status=DomainTicket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         mock_use_case.execute.return_value = mock_domain_ticket
@@ -149,7 +148,7 @@ class TestTicketViewSet(TestCase):
         )
 
         # Simular perform_create
-        serializer = TicketSerializer(data={"title": "Test", "description": "Desc"})
+        serializer = TicketSerializer(data={"title": "Test", "description": "Desc", "user_id": "user-1"})
         serializer.is_valid()
 
         viewset.perform_create(serializer)
@@ -166,8 +165,8 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = InvalidTicketData("Título vacío")
         viewset.create_ticket_use_case = mock_use_case
 
-        serializer = TicketSerializer(data={"title": "", "description": "Desc"})
-        serializer.is_valid()
+        serializer = TicketSerializer(data={"title": "Test", "description": "Desc", "user_id": "user-1"})
+        serializer.is_valid(raise_exception=True)
 
         # Debe lanzar ValidationError
         from rest_framework.exceptions import ValidationError
@@ -192,13 +191,14 @@ class TestTicketViewSet(TestCase):
             title="Test",
             description="Desc",
             status=DomainTicket.IN_PROGRESS,
+            user_id="user-1",
             created_at=django_ticket.created_at
         )
         mock_use_case.execute.return_value = mock_domain_ticket
         viewset.change_status_use_case = mock_use_case
 
         # Crear request
-        request = self.factory.patch('', {"status": "IN_PROGRESS"})
+        request = self._make_drf_request(self.factory.patch('', {"status": "IN_PROGRESS"}))
 
         # Ejecutar action
         response = viewset.change_status(request, pk=django_ticket.id)
@@ -222,7 +222,7 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = TicketAlreadyClosed(django_ticket.id)
         viewset.change_status_use_case = mock_use_case
 
-        request = self.factory.patch('', {"status": "OPEN"})
+        request = self._make_drf_request(self.factory.patch('', {"status": "OPEN"}))
 
         response = viewset.change_status(request, pk=django_ticket.id)
 
@@ -238,7 +238,7 @@ class TestTicketViewSet(TestCase):
         )
 
         viewset = TicketViewSet()
-        request = self.factory.patch('', {})  # Sin status
+        request = self._make_drf_request(self.factory.patch('', {}))  # Sin status
 
         response = viewset.change_status(request, pk=django_ticket.id)
 
@@ -260,7 +260,7 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = ValueError("Estado inválido")
         viewset.change_status_use_case = mock_use_case
 
-        request = self.factory.patch('', {"status": "INVALID"})
+        request = self._make_drf_request(self.factory.patch('', {"status": "INVALID"}))
 
         response = viewset.change_status(request, pk=django_ticket.id)
 
@@ -281,7 +281,7 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = TicketNotFoundException(99999)
         viewset.change_status_use_case = mock_use_case
 
-        request = self.factory.patch('', {"status": "IN_PROGRESS"})
+        request = self._make_drf_request(self.factory.patch('', {"status": "IN_PROGRESS"}))
 
         response = viewset.change_status(request, pk=99999)
 
@@ -304,7 +304,7 @@ class TestTicketViewSet(TestCase):
         mock_use_case.execute.side_effect = RuntimeError("DB connection lost")
         viewset.change_status_use_case = mock_use_case
 
-        request = self.factory.patch('', {"status": "IN_PROGRESS"})
+        request = self._make_drf_request(self.factory.patch('', {"status": "IN_PROGRESS"}))
 
         response = viewset.change_status(request, pk=django_ticket.id)
 
