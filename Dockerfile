@@ -41,11 +41,14 @@ COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
 
 
+RUN chmod +x entrypoint.sh
+
+
 USER app
 
 
 EXPOSE 8000
 
 
-CMD ["gunicorn", "ticket_service.wsgi:application", "--bind", "0.0.0.0:8000"]
+ENTRYPOINT ["./entrypoint.sh"]
 
