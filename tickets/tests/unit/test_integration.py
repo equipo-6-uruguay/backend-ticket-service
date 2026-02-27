@@ -39,7 +39,8 @@ class TestTicketWorkflowIntegration(TestCase):
         
         command = CreateTicketCommand(
             title="Integration Test Ticket",
-            description="Testing full workflow"
+            description="Testing full workflow",
+            user_id="user-1"
         )
         
         ticket = create_use_case.execute(command)
@@ -82,7 +83,7 @@ class TestTicketWorkflowIntegration(TestCase):
             self.event_publisher
         )
         ticket = create_use_case.execute(
-            CreateTicketCommand("Test", "Desc")
+            CreateTicketCommand("Test", "Desc", "user-1")
         )
         
         # Cerrar ticket
@@ -112,7 +113,7 @@ class TestTicketWorkflowIntegration(TestCase):
             self.event_publisher
         )
         ticket = create_use_case.execute(
-            CreateTicketCommand("Test", "Desc")
+            CreateTicketCommand("Test", "Desc", "user-1")
         )
         
         initial_call_count = self.event_publisher.publish.call_count
@@ -168,7 +169,8 @@ class TestRabbitMQEventPublisherIntegration(TestCase):
             ticket_id=1,
             title="Test",
             description="Desc",
-            status="OPEN"
+            status="OPEN",
+            user_id="user-1"
         )
         
         publisher.publish(event)

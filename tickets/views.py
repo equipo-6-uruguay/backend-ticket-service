@@ -6,6 +6,7 @@ NO contienen lógica de negocio, NO acceden directamente al ORM.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.response import Response
 from django.db import transaction
 
@@ -26,6 +27,7 @@ from .infrastructure.event_publisher import RabbitMQEventPublisher
 from .domain.exceptions import (
     DomainException,
     TicketAlreadyClosed,
+    TicketNotFoundException,
     InvalidTicketData,
     DangerousInputError,
     EmptyResponseError,
@@ -33,33 +35,50 @@ from .domain.exceptions import (
 )
 
 
-class TicketViewSet(viewsets.ModelViewSet):
+class TicketViewSet(
+    CreateModelMixin,
+    RetrieveModelMixin,
+    ListModelMixin,
+    viewsets.GenericViewSet,
+):
     """
     ViewSet refactorizado siguiendo principios DDD/EDA.
-    
+
+    Hereda explícitamente de CreateModelMixin, RetrieveModelMixin,
+    ListModelMixin y GenericViewSet. Los mixins UpdateModelMixin y
+    DestroyModelMixin están excluidos INTENCIONALMENTE para impedir
+    que clientes utilicen PUT/PATCH/DELETE genéricos, los cuales
+    evadirían la máquina de estados del dominio, las transiciones
+    de prioridad, la validación XSS y la publicación de eventos.
+
+    Las únicas vías de mutación legítimas son las acciones custom:
+      - PATCH /api/tickets/{id}/status/    → change_status
+      - PATCH /api/tickets/{id}/priority/  → change_priority
+      - POST  /api/tickets/{id}/responses/ → responses
+
     Responsabilidades:
     - Validar entrada HTTP
     - Ejecutar casos de uso
     - Traducir respuestas de dominio a HTTP
     - Manejar excepciones de dominio
-    
+
     NO responsable de:
     - Lógica de negocio (en entidades y casos de uso)
     - Persistencia directa (delegada al repositorio)
     - Publicación de eventos (delegada al event publisher)
     """
-    
+
     queryset = Ticket.objects.all().order_by("-created_at")
     serializer_class = TicketSerializer
-    
+
     def __init__(self, *args, **kwargs):
         """Inicializa las dependencias (repositorio, event publisher, use cases)."""
         super().__init__(*args, **kwargs)
-        
+
         # Inyección de dependencias
         self.repository = DjangoTicketRepository()
         self.event_publisher = RabbitMQEventPublisher()
-        
+
         # Casos de uso
         self.create_ticket_use_case = CreateTicketUseCase(
             repository=self.repository,
@@ -137,6 +156,12 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
             
+        except TicketNotFoundException as e:
+            # Ticket no existe: recurso no encontrado
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except TicketAlreadyClosed as e:
             # Ticket cerrado: regla de negocio violada
             return Response(
@@ -144,7 +169,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as e:
-            # Estado inválido o ticket no encontrado
+            # Estado inválido
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -154,6 +179,11 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
     
     @action(detail=True, methods=["patch"], url_path="priority")
@@ -172,6 +202,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         Errores:
             - 400: Campo 'priority' ausente, ticket cerrado, transición inválida.
             - 403: Permiso denegado (excepción de dominio).
+            - 404: Ticket no encontrado.
+            - 500: Error interno inesperado.
         """
         new_priority = request.data.get("priority")
         justification = request.data.get("justification")
@@ -209,6 +241,12 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
+        except TicketNotFoundException as e:
+            # Ticket no existe: recurso no encontrado
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except (TicketAlreadyClosed, InvalidPriorityTransition) as e:
             # Regla de negocio violada: ticket cerrado o transición de prioridad inválida
             return Response(
@@ -216,7 +254,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as e:
-            # Valor inválido o ticket no encontrado
+            # Valor inválido
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -226,6 +264,11 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=False, methods=["get"], url_path="my-tickets/(?P<user_id>[^/.]+)")
@@ -252,9 +295,9 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
             
-        except Exception as e:
+        except Exception:
             return Response(
-                {"error": f"Error al obtener tickets: {str(e)}"},
+                {"error": "Error interno del servidor"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -336,7 +379,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         Returns:
             Response 201 con la respuesta creada, 403 si no es ADMIN,
-            o 400 ante error de dominio.
+            400 ante error de dominio, o 404 si el ticket no existe.
 
         Raises:
             No lanza excepciones; todas se traducen a respuestas HTTP.
@@ -386,7 +429,12 @@ class TicketViewSet(viewsets.ModelViewSet):
         except Ticket.DoesNotExist:
             return Response(
                 {"error": f"Ticket {ticket_id} no encontrado"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except TicketNotFoundException as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
             )
         except TicketAlreadyClosed as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

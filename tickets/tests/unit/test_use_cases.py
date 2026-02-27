@@ -17,10 +17,13 @@ from tickets.domain.exceptions import (
     InvalidTicketData,
     InvalidTicketStateTransition,
     TicketAlreadyClosed,
+    TicketNotFoundException,
 )
 from tickets.domain.factories import TicketFactory
 
 from tickets.application.use_cases import (
+    AddTicketResponseCommand,
+    AddTicketResponseUseCase,
     CreateTicketUseCase,
     CreateTicketCommand,
     ChangeTicketStatusUseCase,
@@ -202,7 +205,7 @@ class TestChangeTicketStatusUseCase:
         use_case = ChangeTicketStatusUseCase(mock_repo, mock_publisher)
         command = ChangeTicketStatusCommand(999, Ticket.IN_PROGRESS)
         
-        with pytest.raises(ValueError, match="no encontrado"):
+        with pytest.raises(TicketNotFoundException):
             use_case.execute(command)
         
         # No debe guardar ni publicar
@@ -951,6 +954,38 @@ class TestChangeTicketPriorityUseCase:
         mock_repo.save.assert_not_called()
         mock_publisher.publish.assert_not_called()
 
+    def test_change_priority_ticket_not_found(self):
+        """
+        Cambiar prioridad de ticket inexistente lanza TicketNotFoundException.
+
+        Scenario: Cambiar prioridad de ticket inexistente → 404
+          Given un ticket con ID 99999 no existe en el sistema
+          When el administrador intenta cambiar la prioridad
+          Then se lanza TicketNotFoundException
+          And no se persiste ningún cambio
+          And no se publica ningún evento de dominio
+        """
+        # Arrange
+        mock_repo = Mock(spec=TicketRepository)
+        mock_publisher = Mock(spec=EventPublisher)
+
+        mock_repo.find_by_id.return_value = None
+
+        use_case = ChangeTicketPriorityUseCase(mock_repo, mock_publisher)
+        command = ChangeTicketPriorityCommand(
+            ticket_id=99999,
+            new_priority="High",
+        )
+        command.user_role = "Administrador"
+
+        # Act & Assert
+        with pytest.raises(TicketNotFoundException, match="99999"):
+            use_case.execute(command)
+
+        # No debe guardar ni publicar
+        mock_repo.save.assert_not_called()
+        mock_publisher.publish.assert_not_called()
+
     # ──────────────────────────────────────────────────────────────
     # Decision Table tests (DT1–DT5)
     # ──────────────────────────────────────────────────────────────
@@ -1187,6 +1222,42 @@ class TestChangeTicketPriorityUseCase:
 
         # Assert — no domain events collected
         assert existing_ticket.collect_domain_events() == []
+
+
+class TestAddTicketResponseUseCaseNotFound:
+    """Tests de ticket no encontrado en AddTicketResponseUseCase."""
+
+    def test_add_response_ticket_not_found(self):
+        """
+        Agregar respuesta a ticket inexistente lanza TicketNotFoundException.
+
+        Scenario: Agregar respuesta a ticket inexistente → 404
+          Given un ticket con ID 99999 no existe en el sistema
+          When un administrador intenta agregar una respuesta
+          Then se lanza TicketNotFoundException
+          And no se persiste nada
+          And no se publica ningún evento de dominio
+        """
+        # Arrange
+        mock_repo = Mock(spec=TicketRepository)
+        mock_publisher = Mock(spec=EventPublisher)
+
+        mock_repo.find_by_id.return_value = None
+
+        use_case = AddTicketResponseUseCase(mock_repo, mock_publisher)
+        command = AddTicketResponseCommand(
+            ticket_id=99999,
+            text="Hola",
+            admin_id="admin-001",
+        )
+
+        # Act & Assert
+        with pytest.raises(TicketNotFoundException, match="99999"):
+            use_case.execute(command)
+
+        # No debe guardar ni publicar
+        mock_repo.save.assert_not_called()
+        mock_publisher.publish.assert_not_called()
 
 class TestChangeTicketStatusValidation:
     """Tests para validación de transiciones de estado inválidas."""

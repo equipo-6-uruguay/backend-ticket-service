@@ -32,7 +32,8 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
         # Create domain entity using factory method
         ticket = DomainTicket.create(
             title="New Ticket",
-            description="Test description"
+            description="Test description",
+            user_id="user-1"
         )
         
         # Save through repository
@@ -97,7 +98,8 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
         """Test: Save operation preserves entity ID reference."""
         ticket = DomainTicket.create(
             title="Test",
-            description="Desc"
+            description="Desc",
+            user_id="user-1"
         )
         
         # Save and verify same object is updated
@@ -234,6 +236,7 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
             title="Test Title",
             description="Test Description",
             status=DomainTicket.OPEN,
+            user_id="user-1",
             created_at=datetime.now()
         )
         
@@ -276,7 +279,8 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
         # Create domain entity with non-existent ID using factory then modifying
         domain_ticket = DomainTicket.create(
             title="Test",
-            description="Desc"
+            description="Desc",
+            user_id="user-1"
         )
         domain_ticket.id = 99999  # Manually set non-existent ID
         
@@ -294,7 +298,8 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
         # Create domain entity using factory
         original_ticket = DomainTicket.create(
             title="Roundtrip Test",
-            description="Testing data preservation"
+            description="Testing data preservation",
+            user_id="user-1"
         )
         # Change to IN_PROGRESS for testing
         original_ticket.change_status(DomainTicket.IN_PROGRESS)
@@ -317,7 +322,8 @@ class TestDjangoTicketRepositoryIntegration(TestCase):
         # Create and save using factory
         ticket = DomainTicket.create(
             title="Multi Save",
-            description="Original"
+            description="Original",
+            user_id="user-1"
         )
         self.repository.save(ticket)
         
