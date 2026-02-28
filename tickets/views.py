@@ -6,7 +6,7 @@ NO contienen lógica de negocio, NO acceden directamente al ORM.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin, DestroyModelMixin
 from rest_framework.response import Response
 from django.db import transaction
 
@@ -39,22 +39,25 @@ class TicketViewSet(
     CreateModelMixin,
     RetrieveModelMixin,
     ListModelMixin,
+    DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """
     ViewSet refactorizado siguiendo principios DDD/EDA.
 
-    Hereda explícitamente de CreateModelMixin, RetrieveModelMixin,
-    ListModelMixin y GenericViewSet. Los mixins UpdateModelMixin y
-    DestroyModelMixin están excluidos INTENCIONALMENTE para impedir
-    que clientes utilicen PUT/PATCH/DELETE genéricos, los cuales
+    Hereda de CreateModelMixin, RetrieveModelMixin, ListModelMixin, 
+    DestroyModelMixin y GenericViewSet. 
+    Se excluye UpdateModelMixin INTENCIONALMENTE para impedir
+    que clientes utilicen PUT/PATCH genéricos, los cuales
     evadirían la máquina de estados del dominio, las transiciones
     de prioridad, la validación XSS y la publicación de eventos.
 
-    Las únicas vías de mutación legítimas son las acciones custom:
+    Las únicas vías de mutación legítimas son las acciones custom para actualizar
+    y el delete:
       - PATCH /api/tickets/{id}/status/    → change_status
       - PATCH /api/tickets/{id}/priority/  → change_priority
       - POST  /api/tickets/{id}/responses/ → responses
+      - DELETE /api/tickets/{id}/          → destroy
 
     Responsabilidades:
     - Validar entrada HTTP
@@ -122,6 +125,30 @@ class TicketViewSet(
             # Convertir excepción de dominio a error de validación DRF
             from rest_framework.exceptions import ValidationError
             raise ValidationError(str(e))
+
+    def destroy(self, request, pk=None):
+        """
+        Elimina un ticket por ID.
+
+        DELETE /api/tickets/{id}/
+
+        Solo se permite eliminar tickets que existan. Las respuestas
+        asociadas se eliminan en cascada por la base de datos.
+        """
+        try:
+            ticket = self.repository.find_by_id(int(pk))
+            if ticket is None:
+                return Response(
+                    {"error": f"Ticket {pk} no encontrado"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            self.repository.delete(int(pk))
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     
     @action(detail=True, methods=["patch"], url_path="status")
     def change_status(self, request, pk=None):
