@@ -6,7 +6,7 @@ NO contienen lógica de negocio, NO acceden directamente al ORM.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin, DestroyModelMixin
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, ListModelMixin
 from rest_framework.response import Response
 from django.db import transaction
 
@@ -39,7 +39,6 @@ class TicketViewSet(
     CreateModelMixin,
     RetrieveModelMixin,
     ListModelMixin,
-    DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """
@@ -52,12 +51,10 @@ class TicketViewSet(
     evadirían la máquina de estados del dominio, las transiciones
     de prioridad, la validación XSS y la publicación de eventos.
 
-    Las únicas vías de mutación legítimas son las acciones custom para actualizar
-    y el delete:
+    Las únicas vías de mutación legítimas son las acciones custom:
       - PATCH /api/tickets/{id}/status/    → change_status
       - PATCH /api/tickets/{id}/priority/  → change_priority
       - POST  /api/tickets/{id}/responses/ → responses
-      - DELETE /api/tickets/{id}/          → destroy
 
     Responsabilidades:
     - Validar entrada HTTP
