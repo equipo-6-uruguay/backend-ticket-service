@@ -21,6 +21,8 @@ from .application.use_cases import (
     AddTicketResponseCommand,
     ChangeTicketPriorityUseCase,
     ChangeTicketPriorityCommand,
+    DeleteTicketUseCase,
+    DeleteTicketCommand,
 )
 from .infrastructure.repository import DjangoTicketRepository
 from .infrastructure.event_publisher import RabbitMQEventPublisher
@@ -45,27 +47,13 @@ class TicketViewSet(
     ViewSet refactorizado siguiendo principios DDD/EDA.
 
     Hereda explícitamente de CreateModelMixin, RetrieveModelMixin,
-    ListModelMixin y GenericViewSet. Los mixins UpdateModelMixin y
-    DestroyModelMixin están excluidos INTENCIONALMENTE para impedir
-    que clientes utilicen PUT/PATCH/DELETE genéricos, los cuales
-    evadirían la máquina de estados del dominio, las transiciones
-    de prioridad, la validación XSS y la publicación de eventos.
+    ListModelMixin y GenericViewSet.
 
-    Las únicas vías de mutación legítimas son las acciones custom:
-      - PATCH /api/tickets/{id}/status/    → change_status
-      - PATCH /api/tickets/{id}/priority/  → change_priority
-      - POST  /api/tickets/{id}/responses/ → responses
-
-    Responsabilidades:
-    - Validar entrada HTTP
-    - Ejecutar casos de uso
-    - Traducir respuestas de dominio a HTTP
-    - Manejar excepciones de dominio
-
-    NO responsable de:
-    - Lógica de negocio (en entidades y casos de uso)
-    - Persistencia directa (delegada al repositorio)
-    - Publicación de eventos (delegada al event publisher)
+    Las vías de mutación son las acciones custom:
+      - PATCH  /api/tickets/{id}/status/    → change_status
+      - PATCH  /api/tickets/{id}/priority/  → change_priority
+      - POST   /api/tickets/{id}/responses/ → responses
+      - DELETE /api/tickets/{id}/           → destroy
     """
 
     queryset = Ticket.objects.all().order_by("-created_at")
@@ -96,6 +84,10 @@ class TicketViewSet(
             repository=self.repository,
             event_publisher=self.event_publisher
         )
+        self.delete_ticket_use_case = DeleteTicketUseCase(
+            repository=self.repository,
+            event_publisher=self.event_publisher
+        )
     
     def perform_create(self, serializer):
         """
@@ -122,6 +114,28 @@ class TicketViewSet(
             # Convertir excepción de dominio a error de validación DRF
             from rest_framework.exceptions import ValidationError
             raise ValidationError(str(e))
+
+    def destroy(self, request, pk=None):
+        """
+        Elimina un ticket ejecutando el caso de uso.
+
+        DELETE /api/tickets/{id}/
+        """
+        try:
+            command = DeleteTicketCommand(ticket_id=int(pk))
+            self.delete_ticket_use_case.execute(command)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except TicketNotFoundException as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception:
+            return Response(
+                {"error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     
     @action(detail=True, methods=["patch"], url_path="status")
     def change_status(self, request, pk=None):

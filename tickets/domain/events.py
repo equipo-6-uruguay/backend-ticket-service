@@ -49,3 +49,12 @@ class TicketResponseAdded(DomainEvent):
     admin_id: str
     response_text: str
     user_id: str
+
+
+@dataclass(frozen=True)
+class TicketDeleted(DomainEvent):
+    """Evento: Se ha eliminado un ticket."""
+    ticket_id: int
+    title: str
+    user_id: str
+

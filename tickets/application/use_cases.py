@@ -10,7 +10,7 @@ from ..domain.entities import Ticket
 from ..domain.factories import TicketFactory
 from ..domain.repositories import TicketRepository
 from ..domain.event_publisher import EventPublisher
-from ..domain.events import TicketCreated, TicketStatusChanged, TicketResponseAdded
+from ..domain.events import TicketCreated, TicketStatusChanged, TicketResponseAdded, TicketDeleted
 from ..domain.exceptions import TicketAlreadyClosed, DomainException, TicketNotFoundException
 
 
@@ -303,3 +303,57 @@ class AddTicketResponseUseCase:
         self.event_publisher.publish(event)
 
         return ticket
+
+
+@dataclass
+class DeleteTicketCommand:
+    """Comando: Eliminar un ticket."""
+    ticket_id: int
+
+
+class DeleteTicketUseCase:
+    """
+    Caso de uso: Eliminar un ticket.
+
+    Responsabilidades:
+    1. Obtener el ticket del repositorio
+    2. Eliminar el ticket
+    3. Publicar evento de dominio
+    """
+
+    def __init__(
+        self,
+        repository: TicketRepository,
+        event_publisher: EventPublisher
+    ):
+        self.repository = repository
+        self.event_publisher = event_publisher
+
+    def execute(self, command: DeleteTicketCommand) -> None:
+        """
+        Ejecuta el caso de uso de eliminación de ticket.
+
+        Args:
+            command: Comando con el ID del ticket a eliminar
+
+        Raises:
+            TicketNotFoundException: Si el ticket no existe
+        """
+        # 1. Obtener el ticket (verificar que existe)
+        ticket = self.repository.find_by_id(command.ticket_id)
+
+        if not ticket:
+            raise TicketNotFoundException(command.ticket_id)
+
+        # 2. Eliminar el ticket
+        self.repository.delete(command.ticket_id)
+
+        # 3. Publicar evento de dominio
+        event = TicketDeleted(
+            occurred_at=datetime.now(),
+            ticket_id=ticket.id,
+            title=ticket.title,
+            user_id=ticket.user_id
+        )
+        self.event_publisher.publish(event)
+

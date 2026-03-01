@@ -39,12 +39,12 @@ class TestTicketViewSetMixinComposition(TestCase):
         )
 
     def test_viewset_does_not_include_destroy_mixin(self):
-        """DestroyModelMixin must NOT be in the MRO — generic DELETE disabled."""
+        """DestroyModelMixin must NOT be in the MRO — we use a custom destroy method instead."""
         from rest_framework.mixins import DestroyModelMixin
         self.assertNotIn(
             DestroyModelMixin,
             TicketViewSet.__mro__,
-            "TicketViewSet must NOT inherit DestroyModelMixin",
+            "TicketViewSet must NOT inherit DestroyModelMixin (uses custom destroy)",
         )
 
     def test_viewset_has_no_update_method_from_mixin(self):
@@ -64,12 +64,12 @@ class TestTicketViewSetMixinComposition(TestCase):
             "TicketViewSet must not expose a 'partial_update' action from UpdateModelMixin",
         )
 
-    def test_viewset_has_no_destroy_method_from_mixin(self):
-        """The 'destroy' action must not be resolvable on TicketViewSet."""
+    def test_viewset_has_custom_destroy_method(self):
+        """The 'destroy' action must be available as a custom method on TicketViewSet."""
         viewset = TicketViewSet()
-        self.assertFalse(
+        self.assertTrue(
             hasattr(viewset, 'destroy'),
-            "TicketViewSet must not expose a 'destroy' action",
+            "TicketViewSet must expose a custom 'destroy' action",
         )
 
     def test_viewset_includes_create_mixin(self):
@@ -553,21 +553,38 @@ class TestTicketViewSet(TestCase):
         assert response.data['priority'] == "High"
         assert response.data.get('priority_justification') == "Urgente"
 
-    def test_create_response_ticket_not_found_returns_404(self):
-        """ViewSet devuelve 404 cuando _create_response opera sobre ticket inexistente."""
-        viewset = TicketViewSet()
-
-        # Simular un request de ADMIN con datos válidos
-        request = self._make_drf_request(
-            self.factory.post('', {"text": "Respuesta", "admin_id": "admin-001"}, format="json")
+    def test_destroy_executes_delete_use_case(self):
+        """Endpoint destroy ejecuta DeleteTicketUseCase y devuelve 204."""
+        django_ticket = DjangoTicket.objects.create(
+            title="Test",
+            description="Desc",
+            status="OPEN"
         )
 
-        # Mock del user con token ADMIN
-        mock_user = Mock()
-        mock_user.token = {"role": "ADMIN"}
-        request._user = mock_user
+        viewset = TicketViewSet()
 
-        response = viewset._create_response(request, ticket_id="99999")
+        mock_use_case = Mock()
+        mock_use_case.execute.return_value = None
+        viewset.delete_ticket_use_case = mock_use_case
+
+        request = self._make_drf_request(self.factory.delete(''))
+
+        response = viewset.destroy(request, pk=django_ticket.id)
+
+        mock_use_case.execute.assert_called_once()
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_destroy_ticket_not_found_returns_404(self):
+        """ViewSet devuelve 404 cuando destroy recibe TicketNotFoundException."""
+        viewset = TicketViewSet()
+
+        mock_use_case = Mock()
+        mock_use_case.execute.side_effect = TicketNotFoundException(99999)
+        viewset.delete_ticket_use_case = mock_use_case
+
+        request = self._make_drf_request(self.factory.delete(''))
+
+        response = viewset.destroy(request, pk=99999)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "no encontrado" in str(response.data['error']).lower()
