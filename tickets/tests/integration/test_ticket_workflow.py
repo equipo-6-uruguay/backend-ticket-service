@@ -805,14 +805,14 @@ class TestCompleteTicketWorkflow(TestCase):
 
     @patch("tickets.infrastructure.event_publisher.RabbitMQEventPublisher.publish")
     @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate")
-    def test_delete_generic_returns_405_and_ticket_intact(self, mock_auth, mock_publish):
-        """Gherkin AC-3: DELETE /api/tickets/{id}/ returns 405 and ticket still exists."""
+    def test_delete_generic_returns_204_and_deletes_ticket(self, mock_auth, mock_publish):
+        """Gherkin AC-3: DELETE /api/tickets/{id}/ returns 204 and deletes ticket."""
         mock_user = Mock()
         mock_user.is_authenticated = True
         mock_auth.return_value = (mock_user, "fake-token")
 
         ticket = DjangoTicket.objects.create(
-            title="Should Not Be Deleted",
+            title="Should Be Deleted",
             description="Persistence check",
             status="OPEN",
             user_id="user-1",
@@ -822,10 +822,10 @@ class TestCompleteTicketWorkflow(TestCase):
         url = f"/api/tickets/{ticket.id}/"
         response = client.delete(url)
 
-        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.status_code, 204)
 
-        # Ticket must still exist
-        self.assertTrue(DjangoTicket.objects.filter(pk=ticket.id).exists())
+        # Ticket must not exist
+        self.assertFalse(DjangoTicket.objects.filter(pk=ticket.id).exists())
 
     @patch("tickets.infrastructure.event_publisher.RabbitMQEventPublisher.publish")
     @patch("tickets.infrastructure.cookie_auth.CookieJWTStatelessAuthentication.authenticate")
